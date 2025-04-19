@@ -47,12 +47,12 @@ const AdminDashboard = () => {
     };
   }, [lastActivity]);
 
-  // Welcome notification on mount
-  useEffect(() => {
-    if (user && user.name) {
-      toast.success(`Welcome back, Admin ${user.name}!`);
-    }
-  }, [user]);
+  // // Welcome notification on mount
+  // useEffect(() => {
+  //   if (user && user.name) {
+  //     toast.success(`Welcome back, Admin ${user.name}!`);
+  //   }
+  // }, [user]);
 
   const showLogoutDialog = () => {
     setShowLogoutConfirmation(true);

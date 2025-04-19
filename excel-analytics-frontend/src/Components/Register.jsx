@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
-import { Eye, EyeOff, User, Mail, Lock, Shield, BarChart3 } from "lucide-react"
+import { Eye, EyeOff, User, Mail, Lock, Shield, BarChart3, Calendar, User2, Phone, MapPin } from "lucide-react"
 import { BaseUrl } from "../endpoint/baseurl"
 import bgImage from "../assets/Registerfrom_Bg.jpg"
 import { toast } from "react-toastify"
@@ -11,11 +11,19 @@ const Register = () => {
     name: "",
     email: "",
     password: "",
+    password: "",
+    confirmPassword: "",
+    age: "",
+    gender: "",
+    phone: "",
+    address: "",
     role: "user",
   })
   const [errors, setErrors] = useState({})
   const [passwordVisible, setPasswordVisible] = useState(false)
+  const [confirmpasswordVisible, setconfirmPasswordVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [countryCode, setCountryCode] = useState("+91");
   const navigate = useNavigate()
 
   const validateForm = () => {
@@ -41,6 +49,38 @@ const Register = () => {
     } else if (formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters"
     }
+
+      // Confirm Password
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password"
+    } else if (formData.confirmPassword !== formData.password) {
+      newErrors.confirmPassword = "Passwords do not match"
+    }
+
+    // Age
+  const age = parseInt(formData.age)
+  if (!formData.age) {
+    newErrors.age = "Age must be between 18 and 100"
+  } else if (isNaN(age) || age < 18 || age > 100) {
+    newErrors.age = "Age must be between 18 and 100"
+  }
+
+  // Gender
+  if (!formData.gender) {
+    newErrors.gender = "Gender is required"
+  }
+
+  // Phone
+  if (!formData.phone) {
+    newErrors.phone = "Please provide a valid phone number"
+  } else if (!/^\+?[1-9]\d{1,14}$/.test(formData.phone)) {
+    newErrors.phone = "Please provide a valid phone number"
+  }
+
+  // Address
+  if (!formData.address) {
+    newErrors.address = "Address is required"
+  }
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -81,16 +121,30 @@ const Register = () => {
     setIsLoading(true)
 
     try {
-      const res = await axios.post(`${BaseUrl}register/`, formData)
+      const  payload= {
+        ...formData,
+        phone: countryCode + formData.phone, 
+      };
+  
+      const res = await axios.post(`${BaseUrl}register/`, payload)
       toast.success("Registration successful! Redirecting to login...")
       setTimeout(() => {
         navigate("/login")
       }, 1500)
     } catch (error) {
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message)
-      } else if (error.response?.status === 409) {
-        toast.error("Email already in use. Please use a different email.")
+      const errorData = error.response?.data;
+      const statusCode = error.response?.status;
+    
+      if (statusCode === 400 && errorData?.error === "User already exists") {
+        toast.error("Email already exists. Please use a different email.");
+        setErrors((prev) => ({ ...prev, email: "User already exists" }));
+      } else if (errorData?.message) {
+        if (errorData.message.includes("email")) {
+          setErrors((prev) => ({ ...prev, email: "Email already in use. Please use a different email." }));
+        } else if (errorData.message.includes("phone")) {
+          setErrors((prev) => ({ ...prev, phone: "User with this phone number already exists" }));
+        }
+        toast.error(errorData.message);
       } else {
         toast.error("Registration failed. Please try again.")
       }
@@ -133,9 +187,6 @@ const Register = () => {
           <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <label htmlFor="name" className="block text-sm font-medium text-white">
-                  Full Name
-                </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
                   <input
@@ -152,9 +203,6 @@ const Register = () => {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-white">
-                  Email
-                </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
                   <input
@@ -172,9 +220,6 @@ const Register = () => {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-white">
-                  Password
-                </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
                   <input
@@ -199,6 +244,142 @@ const Register = () => {
               </div>
 
               <div className="space-y-2">
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
+                  <input
+                    id="confrimpassword"
+                    required
+                    name="confirmPassword"
+                    type={confirmpasswordVisible ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Re-enter your password"
+                    className={`w-full pl-10 py-2 bg-black/60 border ${
+                      errors.password ? "border-red-500" : "border-slate-500"
+                    } rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setconfirmPasswordVisible(!confirmpasswordVisible)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-white"
+                  >
+                    {confirmpasswordVisible ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.confirmPassword}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
+                <input
+                  name="age"
+                  type="number"
+                  value={formData.age}
+                  onChange={handleChange}
+                  className={`w-full pl-10 py-2 bg-black/60 border ${
+                    errors.age ? "border-red-500" : "border-slate-500"
+                  } rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
+                  placeholder="Enter your age"
+                />
+              </div>
+                {errors.age && (
+                  <p className="text-red-500 text-xs mt-1">{errors.age}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+              <div className="relative">
+                <User2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  className={`w-full pl-10 py-2 bg-black/60 border ${
+                    errors.gender ? "border-red-500" : "border-slate-500"
+                  } rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+                {errors.gender && (
+                  <p className="text-red-500 text-xs mt-1">{errors.gender}</p>
+                )}
+              </div>
+              {/* Country Code + Phone Number in one row */}
+              <div className="flex gap-4 w-full">
+                {/* Country Code */}
+                <div className="w-1/4 space-y-2">
+                  <div className="relative">
+                  <select
+                    id="countryCode"
+                    name="countryCode"
+                    defaultValue="+91"
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="w-full py-2 px-3 bg-black/60 border border-slate-500 rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                  >
+                    <option value="+91">+91 (India)</option>
+                    <option value="+1">+1 (USA)</option>
+                    <option value="+44">+44 (UK)</option>
+                    <option value="+61">+61 (Australia)</option>
+                    <option value="+81">+81 (Japan)</option>
+                    <option value="+971">+971 (UAE)</option>
+                  </select>
+
+                  </div>
+                </div>
+                {/* Phone Number */}
+                <div className="w-3/4 space-y-2">
+                  <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    required
+                    placeholder="6876548210"
+                    className={`w-full pl-10 py-2 bg-black/60 border ${
+                      errors.phone ? "border-red-500" : "border-slate-500"
+                    } rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
+                  />
+                  </div>
+                </div>
+              </div>
+              {errors.phone && (
+                <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+              )}
+                <div className="space-y-2">
+                <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
+                  <input
+                    id="address"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    required
+                    placeholder="123 Main Street, City"
+                    className={`w-full pl-10 py-2 bg-black/60 border ${
+                      errors.address ? "border-red-500" : "border-slate-500"
+                    } rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
+                  />
+                </div>
+                {errors.address && (
+                  <p className="text-red-500 text-xs mt-1">{errors.address}</p>
+                )}
+              </div>
+
+              {/* <div className="space-y-2">
                 <label htmlFor="role" className="block text-sm font-medium text-white">
                   Account Type
                 </label>
@@ -215,7 +396,7 @@ const Register = () => {
                     <option value="admin" className="bg-black text-white">Admin</option>
                   </select>
                 </div>
-              </div>
+              </div> */}
             </form>
           </div>
 
