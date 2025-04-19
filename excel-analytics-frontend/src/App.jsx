@@ -10,10 +10,13 @@ import Login from "./Components/Login";
 import Dashboard from "./Components/User/Dashboard";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminDashboard from "./Components/Admin/AdminDashboard";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   return (
     <>
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
       <Router>
         <Routes>
           <Route path="/register" element={<Register />} />

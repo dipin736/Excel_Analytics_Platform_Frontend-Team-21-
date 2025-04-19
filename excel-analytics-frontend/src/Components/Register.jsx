@@ -4,6 +4,7 @@ import axios from "axios"
 import { Eye, EyeOff, User, Mail, Lock, Shield, BarChart3 } from "lucide-react"
 import { BaseUrl } from "../endpoint/baseurl"
 import bgImage from "../assets/Registerfrom_Bg.jpg"
+import { toast } from "react-toastify"
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -12,9 +13,38 @@ const Register = () => {
     password: "",
     role: "user",
   })
+  const [errors, setErrors] = useState({})
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
+
+  const validateForm = () => {
+    const newErrors = {}
+    
+    // Name validation
+    if (!formData.name) {
+      newErrors.name = "Name is required"
+    } else if (formData.name.length < 2) {
+      newErrors.name = "Name must be at least 2 characters"
+    }
+    
+    // Email validation
+    if (!formData.email) {
+      newErrors.email = "Email is required"
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Email is invalid"
+    }
+    
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = "Password is required"
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters"
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -22,6 +52,14 @@ const Register = () => {
       ...prev,
       [name]: value,
     }))
+    
+    // Clear error when user types
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: null
+      })
+    }
   }
 
   const handleRoleChange = (e) => {
@@ -33,13 +71,29 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Validate form before submitting
+    if (!validateForm()) {
+      toast.error("Please fix the errors in the form")
+      return
+    }
+    
     setIsLoading(true)
 
     try {
       const res = await axios.post(`${BaseUrl}register/`, formData)
-      console.log("Registration successful:", res.data)
-      navigate("/login")
+      toast.success("Registration successful! Redirecting to login...")
+      setTimeout(() => {
+        navigate("/login")
+      }, 1500)
     } catch (error) {
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message)
+      } else if (error.response?.status === 409) {
+        toast.error("Email already in use. Please use a different email.")
+      } else {
+        toast.error("Registration failed. Please try again.")
+      }
       console.error("Registration Failed:", error.response?.data || error)
     } finally {
       setIsLoading(false)
@@ -91,9 +145,10 @@ const Register = () => {
                     onChange={handleChange}
                     required
                     placeholder="John Doe"
-                    className="w-full pl-10 py-2 bg-black/60 border border-slate-500 rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    className={`w-full pl-10 py-2 bg-black/60 border ${errors.name ? 'border-red-500' : 'border-slate-500'} rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
                   />
                 </div>
+                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
               </div>
 
               <div className="space-y-2">
@@ -110,9 +165,10 @@ const Register = () => {
                     onChange={handleChange}
                     required
                     placeholder="name@example.com"
-                    className="w-full pl-10 py-2 bg-black/60 border border-slate-500 rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    className={`w-full pl-10 py-2 bg-black/60 border ${errors.email ? 'border-red-500' : 'border-slate-500'} rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
                   />
                 </div>
+                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
               </div>
 
               <div className="space-y-2">
@@ -129,7 +185,7 @@ const Register = () => {
                     onChange={handleChange}
                     required
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-10 py-2 bg-black/60 border border-slate-500 rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    className={`w-full pl-10 pr-10 py-2 bg-black/60 border ${errors.password ? 'border-red-500' : 'border-slate-500'} rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
                   />
                   <button
                     type="button"
@@ -139,6 +195,7 @@ const Register = () => {
                     {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
               </div>
 
               <div className="space-y-2">
@@ -164,24 +221,24 @@ const Register = () => {
 
           <div className="p-6 space-y-4">
           <button
-  onClick={handleSubmit}
-  disabled={isLoading}
-  className="relative px-8 py-3 bg-black text-white font-semibold rounded-lg border-2 border-purple-500 hover:border-purple-400 transition-all duration-300 hover:shadow-[0_0_20px_10px_rgba(168,85,247,0.6)] active:scale-95 active:shadow-[0_0_10px_5px_rgba(168,85,247,0.4)] group"
->
-  <span className="flex items-center space-x-2">
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      fill="none"
-      className="w-6 h-6 text-purple-500 group-hover:text-white transition-colors duration-300"
-    >
-      <path d="M5 13l4 4L19 7" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-    <span>{isLoading ? "Creating Account..." : "Get Started"}</span>
-  </span>
-  <span className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-purple-500/20 to-indigo-500/20" />
-</button>
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className="relative px-8 py-3 bg-black text-white font-semibold rounded-lg border-2 border-purple-500 hover:border-purple-400 transition-all duration-300 hover:shadow-[0_0_20px_10px_rgba(168,85,247,0.6)] active:scale-95 active:shadow-[0_0_10px_5px_rgba(168,85,247,0.4)] disabled:opacity-50 disabled:cursor-not-allowed group"
+          >
+            <span className="flex items-center space-x-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                fill="none"
+                className="w-6 h-6 text-purple-500 group-hover:text-white transition-colors duration-300"
+              >
+                <path d="M5 13l4 4L19 7" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+              </svg>
+              <span>{isLoading ? "Creating Account..." : "Get Started"}</span>
+            </span>
+            <span className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-purple-500/20 to-indigo-500/20" />
+          </button>
 
             <p className="text-center text-sm text-slate-300">
               Already have an account?{" "}

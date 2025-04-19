@@ -5,22 +5,54 @@ import { Eye, EyeOff, User, Mail, Lock, Shield, BarChart3 } from "lucide-react"
 import { BaseUrl } from "../endpoint/baseurl"
 import bgImage from "../assets/Registerfrom_Bg.jpg"
 import { useAuth } from "../Context/AuthContext."
+import { toast } from "react-toastify"
 
 const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
+  const [errors, setErrors] = useState({})
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
-  const { setToken,setUser } = useAuth();
+  const { setToken, setUser } = useAuth();
+
+  const validateForm = () => {
+    const newErrors = {}
+    
+    // Email validation
+    if (!formData.email) {
+      newErrors.email = "Email is required"
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Email is invalid"
+    }
+    
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = "Password is required"
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters"
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
+    
+    // Clear error when user types
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: null
+      })
+    }
   }
 
   const handleRoleChange = (e) => {
@@ -32,24 +64,41 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Validate form before submitting
+    if (!validateForm()) {
+      toast.error("Please fix the errors in the form")
+      return
+    }
+    
     setIsLoading(true)
 
     try {
       const res = await axios.post(`${BaseUrl}login/`, formData)
       const role = res.data?.user?.role;
       const token = res.data?.token;
-      console.log("Login successful:", res.data);
+      
       localStorage.setItem("token", token);
       localStorage.setItem("role", role);
 
       setToken(token);
       setUser(res.data.user); 
+      
+      toast.success("Login successful!")
+      
       if (role === "admin") {
         navigate("/admin/dashboard");
       } else {
         navigate("/dashboard");
       }
     } catch (error) {
+      if (error.response?.status === 401) {
+        toast.error("Invalid email or password")
+      } else if (error.response?.data?.message) {
+        toast.error(error.response.data.message)
+      } else {
+        toast.error("An error occurred during login")
+      }
       console.error("Login Failed:", error.response?.data || error)
     } finally {
       setIsLoading(false)
@@ -109,9 +158,10 @@ const Login = () => {
                     onChange={handleChange}
                     required
                     placeholder="name@example.com"
-                    className="w-full pl-10 py-2 bg-black/60 border border-slate-500 rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    className={`w-full pl-10 py-2 bg-black/60 border ${errors.email ? 'border-red-500' : 'border-slate-500'} rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
                   />
                 </div>
+                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
               </div>
 
               <div className="space-y-2">
@@ -131,7 +181,7 @@ const Login = () => {
                     onChange={handleChange}
                     required
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-10 py-2 bg-black/60 border border-slate-500 rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    className={`w-full pl-10 pr-10 py-2 bg-black/60 border ${errors.password ? 'border-red-500' : 'border-slate-500'} rounded-md text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400`}
                   />
                   <button
                     type="button"
@@ -145,6 +195,7 @@ const Login = () => {
                     )}
                   </button>
                 </div>
+                {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
               </div>
 
             </form>
@@ -154,7 +205,7 @@ const Login = () => {
             <button
               onClick={handleSubmit}
               disabled={isLoading}
-              className="relative px-8 py-3 bg-black text-white font-semibold rounded-lg border-2 border-purple-500 hover:border-purple-400 transition-all duration-300 hover:shadow-[0_0_20px_10px_rgba(168,85,247,0.6)] active:scale-95 active:shadow-[0_0_10px_5px_rgba(168,85,247,0.4)] group"
+              className="relative px-8 py-3 bg-black text-white font-semibold rounded-lg border-2 border-purple-500 hover:border-purple-400 transition-all duration-300 hover:shadow-[0_0_20px_10px_rgba(168,85,247,0.6)] active:scale-95 active:shadow-[0_0_10px_5px_rgba(168,85,247,0.4)] disabled:opacity-50 disabled:cursor-not-allowed group"
             >
               <span className="flex items-center space-x-2">
                 <svg
@@ -177,7 +228,7 @@ const Login = () => {
             </button>
 
             <p className="text-center text-sm text-slate-300">
-               Don’t have an account?{" "}
+               Don't have an account?{" "}
               <a
                 href="/register"
                 className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
