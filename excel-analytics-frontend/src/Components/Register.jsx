@@ -11,7 +11,6 @@ const Register = () => {
     name: "",
     email: "",
     password: "",
-    password: "",
     confirmPassword: "",
     age: "",
     gender: "",
