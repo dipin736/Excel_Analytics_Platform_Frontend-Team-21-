@@ -30,7 +30,7 @@ function App() {
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
           </Route>
 
-          <Route exact path="/" element={<Navigate to="/register" />} />
+          <Route exact path="/" element={<Navigate to="/login" />} />
           <Route path="*" element={<Navigate to="/register" />} />
         </Routes>
       </Router>
