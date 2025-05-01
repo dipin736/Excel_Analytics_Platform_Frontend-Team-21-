@@ -11,9 +11,64 @@ import {
 } from "react-icons/fi";
 import {  BaseUrluser } from "../../endpoint/baseurl";
 import FileAnalyzer from "./FileAnalyzer";
+import { toast } from "react-toastify";
 
 const ExcelFileList = ({ files, setActiveTab }) => {
     const [selectedFile, setSelectedFile] = useState(null);
+
+    const handleDelete = (dashboardId) => {
+      toast.info(
+        ({ closeToast }) => (
+          <div>
+            <p className="font-medium">Delete this file?</p>
+            <div className="mt-2 flex gap-2 justify-end">
+              <button
+                onClick={async () => {
+                  closeToast();
+                  try {
+                    const response = await fetch(
+                      `${BaseUrluser}/excel/${dashboardId}`,
+                      {
+                        method: "DELETE",
+                        headers: {
+                          Authorization: `Bearer ${localStorage.getItem(
+                            "token"
+                          )}`,
+                        },
+                      }
+                    );
+  
+                    const result = await response.json();
+                    if (result.success) {
+                      toast.success("Dashboard deleted successfully.");
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 1500);
+                    } else {
+                      toast.error("Delete failed: " + result.message);
+                    }
+                  } catch (error) {
+                    console.error("Error deleting dashboard:", error);
+                    toast.error("An error occurred during deletion.");
+                  }
+                }}
+                className="bg-red-600 text-white px-3 py-1 rounded"
+              >
+                Yes
+              </button>
+              <button
+                onClick={closeToast}
+                className="bg-gray-300 text-black px-3 py-1 rounded"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        ),
+        { autoClose: false }
+      );
+    };
+  
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
@@ -82,7 +137,9 @@ const ExcelFileList = ({ files, setActiveTab }) => {
                       </div>
                     </div>
                   )}
-                  <button className="text-red-600 hover:text-red-900">
+                  <button
+                    onClick={() => handleDelete(file._id)}
+                  className="text-red-600 hover:text-red-900">
                     Delete
                   </button>
                 </td>
