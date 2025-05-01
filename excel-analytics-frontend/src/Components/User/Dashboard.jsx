@@ -238,7 +238,9 @@ const Dashboard = () => {
       case "dashboard":
         return <DashboardView stats={userStats} />;
       case "dashboards":
-        return <DashboardList dashboards={dashboards} />;
+        return <DashboardList dashboards={dashboards}
+        setDashboards={setDashboards}
+        />;
       case "excel":
         return <ExcelFileList files={excelFiles} setActiveTab={setActiveTab} />;
       case "upload":
