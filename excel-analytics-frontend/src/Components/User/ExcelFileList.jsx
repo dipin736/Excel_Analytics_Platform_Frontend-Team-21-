@@ -7,8 +7,11 @@ import {
   FiLogOut,
   FiUser,
   FiX,
-  FiBarChart2,
+  FiBarChart2,FiTrash2
+
 } from "react-icons/fi";
+import { motion } from 'framer-motion';
+
 import {  BaseUrluser } from "../../endpoint/baseurl";
 import FileAnalyzer from "./FileAnalyzer";
 import { toast } from "react-toastify";
@@ -70,86 +73,145 @@ const ExcelFileList = ({ files, setActiveTab }) => {
     };
   
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Excel Files</h2>
-        <button
-          onClick={() => setActiveTab("upload")}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          + Upload File
-        </button>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                File Name
+    <div className="space-y-6 p-4">
+    {/* Header with Upload Button */}
+    <motion.div 
+      className="flex justify-between items-center"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <h2 className="text-2xl font-bold text-gray-800">Excel Files</h2>
+      <motion.button
+        onClick={() => setActiveTab("upload")}
+        className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-2.5 rounded-xl hover:shadow-lg transition-all"
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+      >
+        <FiUpload className="text-lg" />
+        <span>Upload File</span>
+      </motion.button>
+    </motion.div>
+  
+    {/* Files Table */}
+    <motion.div 
+      className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.3 }}
+    >
+      <table className="min-w-full divide-y divide-gray-200/50">
+        <thead className="bg-gray-50/80">
+          <tr>
+            {["File Name", "Size", "Upload Date", "Actions"].map((header, idx) => (
+              <th 
+                key={idx}
+                className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                {header}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Size
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Upload Date
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {files.map((file) => (
-              <tr key={file._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <FiFileText className="flex-shrink-0 h-5 w-5 text-blue-500" />
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {file.originalName}
-                      </div>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200/50">
+          {files.map((file, index) => (
+            <motion.tr 
+              key={file._id}
+              className="hover:bg-gray-50/50 transition-colors"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 + (index * 0.05), duration: 0.3 }}
+            >
+              {/* File Name */}
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <FiFileText className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="ml-4">
+                    <div className="text-sm font-medium text-gray-900 truncate max-w-xs">
+                      {file.originalName}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {file.sheets?.length || 0} sheets
                     </div>
                   </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {Math.round(file.fileSize / 1024)} KB
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(file.uploadDate).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => setSelectedFile(file._id)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-3"
-                  >
-                    Analyze
-                  </button>
-
-                  {selectedFile && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                      <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-auto">
-                        <FileAnalyzer
-                          fileId={selectedFile}
-                          files={files}
-                          onClose={() => setSelectedFile(null)}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => handleDelete(file._id)}
-                  className="text-red-600 hover:text-red-900">
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                </div>
+              </td>
   
+              {/* File Size */}
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-700">
+                  {(file.fileSize / (1024 * 1024)).toFixed(2)} MB
+                </div>
+              </td>
+  
+              {/* Upload Date */}
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-700">
+                  {new Date(file.uploadDate).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div>
+              </td>
+  
+              {/* Actions */}
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center space-x-3">
+                  <motion.button
+                    onClick={() => setSelectedFile(file._id)}
+                    className="flex items-center gap-1 text-sm bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <FiBarChart2 size={14} />
+                    Analyze
+                  </motion.button>
+  
+                  <motion.button
+                    onClick={() => handleDelete(file._id)}
+                    className="flex items-center gap-1 text-sm bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <FiTrash2 size={14} />
+                    Delete
+                  </motion.button>
+                </div>
+              </td>
+            </motion.tr>
+          ))}
+        </tbody>
+      </table>
+    </motion.div>
+  
+    {/* File Analyzer Modal */}
+    {selectedFile && (
+      <motion.div 
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden border border-white/20"
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+        >
+          <FileAnalyzer
+            fileId={selectedFile}
+            files={files}
+            onClose={() => setSelectedFile(null)}
+          />
+        </motion.div>
+      </motion.div>
+    )}
+  </div>
 
 
   )
