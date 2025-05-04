@@ -10,25 +10,38 @@ import {
   FiLogOut,
   FiUser,
   FiX,
-  FiBarChart2,
+  FiBarChart2,FiMoon,FiSun 
 } from "react-icons/fi";
-import { BaseUrluser } from "../../endpoint/baseurl";
+import { BaseUrl, BaseUrluser } from "../../endpoint/baseurl";
 import ExcelFileList from "./ExcelFileList";
 import ExcelUploader from "./ExcelUploader";
 import DashboardList from "./DashboardList";
 import DashboardView from "./DashboardView";
 import { motion, AnimatePresence } from "framer-motion";
-const NavButton = ({ children, icon, active, onClick }) => (
+import UserProfile from "./UserProfile";
+const NavButton = ({ active, onClick, icon, children, darkMode }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-      active
-        ? "bg-indigo-600 text-white shadow-md"
-        : "text-indigo-200 hover:bg-indigo-800"
+    className={`w-full text-left flex items-center space-x-3 p-3 rounded-lg transition-all ${
+      active 
+        ? (darkMode ? 'bg-gray-700 shadow-md' : 'bg-white/10 shadow-md')
+        : (darkMode ? 'hover:bg-gray-700/50' : 'hover:bg-white/5')
     }`}
   >
-    <span className="text-lg">{icon}</span>
-    <span>{children}</span>
+    <span className={`text-lg ${
+      active 
+        ? 'text-white' 
+        : (darkMode ? 'text-gray-300' : 'text-indigo-200')
+    }`}>
+      {icon}
+    </span>
+    <span className={`font-medium ${
+      active 
+        ? 'text-white' 
+        : (darkMode ? 'text-gray-300' : 'text-indigo-200')
+    }`}>
+      {children}
+    </span>
   </button>
 );
 const Dashboard = () => {
@@ -254,29 +267,79 @@ const Dashboard = () => {
 
     switch (activeTab) {
       case "dashboard":
-        return <DashboardView stats={userStats} />;
+        return <DashboardView  darkMode={darkMode} stats={userStats} />;
       case "dashboards":
-        return <DashboardList dashboards={dashboards}
+        return <DashboardList dashboards={dashboards} darkMode={darkMode}
         setDashboards={setDashboards}
         />;
       case "excel":
-        return <ExcelFileList files={excelFiles} setActiveTab={setActiveTab} />;
+        return <ExcelFileList darkMode={darkMode} files={excelFiles} setActiveTab={setActiveTab} />;
       case "upload":
-        return <ExcelUploader />;
+        return <ExcelUploader  darkMode={darkMode} />;
+      case "user":
+          return <UserProfile darkMode={darkMode} setDarkMode={setDarkMode}/>;
       default:
         return <div>Select a tab</div>;
     }
   };
+  const [darkMode, setDarkMode] = useState(true);
+ 
+
+  // Toggle dark mode and save to localStorage
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem('darkMode', JSON.stringify(newMode));
+  };
+
+  // Check for saved theme preference on component mount
+  useEffect(() => {
+    const savedMode = JSON.parse(localStorage.getItem('darkMode'));
+    if (savedMode !== null) {
+      setDarkMode(savedMode);
+    }
+  }, []);
+
+  // Theme classes
+  const themeClasses = {
+    background: darkMode 
+      ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
+      : 'bg-gradient-to-br from-blue-50 to-blue-100',
+    sidebar: darkMode 
+      ? 'bg-gradient-to-b from-gray-800 to-gray-900' 
+      : 'bg-gradient-to-b from-indigo-600 to-indigo-700',
+    header: darkMode 
+      ? 'bg-gray-800/70 border-gray-700' 
+      : 'bg-white/70 border-blue-200/50',
+    main: darkMode 
+      ? 'bg-gray-800/80' 
+      : 'bg-blue-100/80',
+    text: darkMode 
+      ? 'text-gray-100' 
+      : 'text-gray-700',
+    modal: darkMode 
+      ? 'bg-gray-800 border-gray-700' 
+      : 'bg-white border-blue-100',
+    modalText: darkMode 
+      ? 'text-gray-100' 
+      : 'text-gray-800',
+    button: darkMode 
+      ? 'bg-gray-700 hover:bg-gray-600' 
+      : 'bg-gray-100 hover:bg-gray-200',
+    logoutButton: darkMode 
+      ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' 
+      : 'bg-gradient-to-r from-red-400 to-red-500 hover:from-red-500 hover:to-red-600'
+  };
 
   return (
     <>
-    <div className="flex h-screen bg-gradient-to-br from-blue-50 to-blue-100">
+     <div className={`flex h-screen ${themeClasses.background}`}>
       {/* Animated Sidebar */}
       <motion.div
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.6, type: 'spring', stiffness: 80, damping: 10 }}
-        className="w-64 bg-gradient-to-b from-indigo-600 to-indigo-700 text-white p-5 flex flex-col shadow-xl"
+        className={`w-64 ${themeClasses.sidebar} text-white p-5 flex flex-col shadow-xl`}
       >
         <div className="mb-10">
           <motion.div
@@ -286,7 +349,7 @@ const Dashboard = () => {
           >
             <FiPieChart className="text-2xl text-indigo-300 animate-spin-slow" />
             <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-indigo-200 bg-clip-text text-transparent">
-              DataViz
+                InsightForge
             </h1>
           </motion.div>
           <p className="text-indigo-300 text-sm mt-1">Interactive Dashboard</p>
@@ -297,7 +360,9 @@ const Dashboard = () => {
             { tab: "dashboard", icon: <FiHome className="animate-pulse" />, label: "Overview" },
             { tab: "dashboards", icon: <FiPieChart className="animate-wiggle" />, label: "My Dashboards" },
             { tab: "excel", icon: <FiFileText className="animate-slide-in-left" />, label: "Excel Files" },
-            { tab: "upload", icon: <FiUpload className="animate-bounce-slow" />, label: "Upload File" }
+            { tab: "upload", icon: <FiUpload className="animate-bounce-slow" />, label: "Upload File" },
+            { tab: "user", icon: <FiUser className="animate-bounce-slow" />, label: "User Profile" }
+
           ].map((item) => (
             <motion.div
               key={item.tab}
@@ -309,6 +374,7 @@ const Dashboard = () => {
                 active={activeTab === item.tab}
                 onClick={() => setActiveTab(item.tab)}
                 icon={item.icon}
+                darkMode={darkMode}
               >
                 {item.label}
               </NavButton>
@@ -316,15 +382,14 @@ const Dashboard = () => {
           ))}
         </nav>
 
-        <motion.div
-          className="mt-auto pt-4 border-t border-indigo-500"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, type: 'spring', stiffness: 70, damping: 11 }}
-        >
+        <div className="mt-auto pt-4 border-t border-indigo-500">
+    
+          {/* User Profile (unchanged) */}
           {userStats && (
             <motion.div
-              className="flex items-center space-x-3 p-3 rounded-lg bg-indigo-800/70 backdrop-blur-sm"
+              className={`flex items-center space-x-3 p-3 rounded-lg ${
+                darkMode ? 'bg-gray-700/70' : 'bg-indigo-800/70'
+              } backdrop-blur-sm`}
               whileHover={{ y: -3 }}
               transition={{ type: 'spring', stiffness: 90, damping: 13 }}
             >
@@ -349,20 +414,18 @@ const Dashboard = () => {
               </div>
             </motion.div>
           )}
-        </motion.div>
+        </div>
       </motion.div>
 
-
       <div className="flex-1 flex flex-col overflow-hidden">
-
         <motion.header
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6, type: 'spring', stiffness: 80, damping: 10 }}
-          className="bg-white/70 backdrop-blur-sm border-b border-blue-200/50 py-4 px-6 flex justify-between items-center shadow-sm"
+          className={`${themeClasses.header} backdrop-blur-sm py-4 px-6 flex justify-between items-center shadow-sm`}
         >
           <motion.h1
-            className="text-xl font-semibold text-gray-700 capitalize"
+            className={`text-xl font-semibold ${themeClasses.text} capitalize`}
             key={activeTab}
             initial={{ x: -10, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -371,16 +434,33 @@ const Dashboard = () => {
             {activeTab.replace("-", " ")}
           </motion.h1>
 
-          <motion.button
-            whileHover={{ scale: 1.08, backgroundColor: 'rgba(255, 0, 0, 0.05)' }}
-            whileTap={{ scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 120, damping: 14 }}
-            onClick={showLogoutDialog}
-            className="flex items-center space-x-2 text-red-500 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg"
-          >
-            <FiLogOut className="animate-fade-in" />
-            <span>Logout</span>
-          </motion.button>
+          <div className="flex items-center space-x-4">
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 120, damping: 14 }}
+              onClick={toggleDarkMode}
+              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {darkMode ? (
+                <FiSun className="text-yellow-300" />
+              ) : (
+                <FiMoon className="text-indigo-700" />
+              )}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.08, backgroundColor: 'rgba(255, 0, 0, 0.05)' }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 120, damping: 14 }}
+              onClick={() => setShowLogoutConfirmation(true)}
+              className="flex items-center space-x-2 text-red-500 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg"
+            >
+              <FiLogOut className="animate-fade-in" />
+              <span>Logout</span>
+            </motion.button>
+          </div>
         </motion.header>
 
         {/* Main Content with Smooth Transitions */}
@@ -391,7 +471,7 @@ const Dashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="flex-1 overflow-y-auto p-6 bg-blue-100/80"
+            className={`flex-1 overflow-y-auto p-6 ${themeClasses.main}`}
           >
             {renderContent()}
           </motion.main>
@@ -412,22 +492,26 @@ const Dashboard = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 100, damping: 16 }}
-              className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-blue-100"
+              className={`${themeClasses.modal} rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl border`}
             >
               <div className="flex items-center space-x-3 mb-4">
                 <div className="p-2 rounded-full bg-red-100 animate-pulse-slow">
                   <FiLogOut className="text-red-500 text-xl" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-800">Confirm Logout</h3>
+                <h3 className={`text-xl font-semibold ${themeClasses.modalText}`}>Confirm Logout</h3>
               </div>
-              <p className="text-gray-600 mb-6">Are you sure you want to log out?</p>
+              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-6`}>
+                Are you sure you want to log out?
+              </p>
               <div className="flex justify-end gap-3">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.97 }}
                   transition={{ type: 'spring', stiffness: 130, damping: 17 }}
-                  onClick={cancelLogout}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all text-gray-700 shadow-sm"
+                  onClick={() => setShowLogoutConfirmation(false)}
+                  className={`px-4 py-2 ${themeClasses.button} rounded-lg transition-all shadow-sm ${
+                    darkMode ? 'text-gray-100' : 'text-gray-700'
+                  }`}
                 >
                   Cancel
                 </motion.button>
@@ -436,7 +520,7 @@ const Dashboard = () => {
                   whileTap={{ scale: 0.97 }}
                   transition={{ type: 'spring', stiffness: 130, damping: 17 }}
                   onClick={handleLogout}
-                  className="px-4 py-2 bg-gradient-to-r from-red-400 to-red-500 hover:from-red-500 hover:to-red-600 text-white rounded-lg transition-all shadow-md"
+                  className={`px-4 py-2 ${themeClasses.logoutButton} text-white rounded-lg transition-all shadow-md`}
                 >
                   Logout
                 </motion.button>
