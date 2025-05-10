@@ -123,9 +123,9 @@ const Login = () => {
               height: `${Math.random() * 120 + 80}px`,
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
-              animation: `float ${Math.random() * 20 + 15}s infinite ease-in-out`,
-              animationDelay: `${Math.random() * 5}s`,
+              animation: `float ${Math.random() * 20 + 15}s ease-in-out infinite ${Math.random() * 5}s`,  // All in one line
             }}
+            
           >
             <div className="p-2">
               <div className="h-full bg-gradient-to-br from-white/10 to-white/5 rounded-lg overflow-hidden">
@@ -140,11 +140,9 @@ const Login = () => {
                         left: `${j * 20 + 10}%`,
                         width: "12%",
                         height: `${Math.random() * 80 + 20}%`,
-                        animation: `grow ${
-                          Math.random() * 3 + 2
-                        }s infinite ease-in-out alternate`,
-                        animationDelay: `${j * 0.2}s`,
+                        animation: `grow ${Math.random() * 3 + 2}s ease-in-out alternate infinite ${j * 0.2}s`,  // All in one line
                       }}
+                      
                     />
                   ))}
                 </div>

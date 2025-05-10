@@ -169,9 +169,12 @@ const Register = () => {
             height: `${Math.random() * 120 + 80}px`,
             top: `${Math.random() * 100}%`,
             left: `${Math.random() * 100}%`,
-            animation: `float ${Math.random() * 20 + 15}s infinite ease-in-out`,
-            animationDelay: `${Math.random() * 5}s`,
+            animationDuration: `${Math.random() * 20 + 15}s`, // Separate duration
+            animationTimingFunction: 'ease-in-out',           // Separate timing function
+            animationIterationCount: 'infinite',             // Separate iteration count
+            animationDelay: `${Math.random() * 5}s`,         // Separate delay
           }}
+          
         >
           <div className="p-2">
             <div className="h-full bg-gradient-to-br from-white/10 to-white/5 rounded-lg overflow-hidden">
@@ -186,11 +189,13 @@ const Register = () => {
                       left: `${j * 20 + 10}%`,
                       width: "12%",
                       height: `${Math.random() * 60 + 10}%`, // Reduced height of bars
-                      animation: `grow ${
-                        Math.random() * 3 + 2
-                      }s infinite ease-in-out alternate`,
-                      animationDelay: `${j * 0.2}s`,
+                      animationDuration: `${Math.random() * 3 + 2}s`, // Separate duration
+                      animationTimingFunction: 'ease-in-out',         // Separate timing function
+                      animationIterationCount: 'infinite',           // Separate iteration count
+                      animationDirection: 'alternate',               // Separate direction
+                      animationDelay: `${j * 0.2}s`,                 // Separate delay
                     }}
+                    
                   />
                 ))}
               </div>

@@ -60,7 +60,7 @@ const COLORS = {
   },
 };
 
-const DynamicChart = ({ data, chartType, xAxis, yAxis }) => {
+const DynamicChart = ({ data, chartType, xAxis, yAxis,darkMode, xAxisColor, yAxisColor }) => {
   // Generate gradient colors for bars/lines
   const generateGradient = (ctx, chartArea) => {
     if (!chartArea) return COLORS.blue[400];
@@ -291,13 +291,47 @@ const DynamicChart = ({ data, chartType, xAxis, yAxis }) => {
       },
     },
   };
+  const StaticOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: xAxisColor || (darkMode ? 'white' : 'black'), // Set color for x-axis labels
+        },
+        title: {
+          display: true,
+          text: xAxis,
+          color: xAxisColor || (darkMode ? 'white' : 'black'), // Set color for x-axis title
+        },
+      },
+      y: {
+        ticks: {
+          color: yAxisColor || (darkMode ? 'white' : 'black'), // Set color for y-axis labels
+        },
+        title: {
+          display: true,
+          text: yAxis,
+          color: yAxisColor || (darkMode ? 'white' : 'black'), // Set color for y-axis title
+        },
+      },
+    },
+  };
 
+  const chartOptions = {
+  ...options,
+  ...StaticOptions,  // Combine StaticOptions with baseOptions
+};
   return (
     <div className="h-96 w-full animate-fade-in">
-      {chartType === "bar" && <Bar data={chartData} options={options} />}
-      {chartType === "pie" && <Pie data={chartData} options={options} />}
-      {chartType === "line" && <Line data={chartData} options={options} />}
-      {chartType === "scatter" && <Scatter data={chartData} options={options} />}
+      {chartType === "bar" && <Bar data={chartData} options={chartOptions} />}
+      {chartType === "pie" && <Pie data={chartData} options={chartOptions} />}
+      {chartType === "line" && <Line data={chartData} options={chartOptions} />}
+      {chartType === "scatter" && <Scatter data={chartData} options={chartOptions} />}
     </div>
   );
 };
