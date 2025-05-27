@@ -4,7 +4,7 @@ import axios from "axios"
 import { Eye, EyeOff, User, Mail, Lock, Shield, BarChart3 } from "lucide-react"
 import { BaseUrl } from "../endpoint/baseurl"
 import bgImage from "../assets/Registerfrom_Bg.jpg"
-import { useAuth } from "../Context/AuthContext."
+import { useAuth } from "../Context/AuthContext.jsx"
 import { toast } from "react-toastify"
 
 const Login = () => {
@@ -298,12 +298,12 @@ const Login = () => {
                     Remember me
                   </label>
                 </div>
-                <a
-                  href="/forgot-password"
+                <Link
+                  to="/forgot-password"
                   className="text-sm text-teal-500 hover:text-teal-400"
                 >
                   Forgot password?
-                </a>
+                </Link>
               </div>
 
               <button
@@ -350,7 +350,7 @@ const Login = () => {
       </div>
 
       {/* CSS animations */}
-      <style jsx global>{`
+      <style>{`
         @keyframes gradient-shift {
           0% {
             background-position: 0% 50%;

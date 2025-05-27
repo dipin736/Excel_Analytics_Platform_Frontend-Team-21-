@@ -7,6 +7,8 @@ import {
 } from "react-router-dom";
 import Register from "./Components/Register";
 import Login from "./Components/Login";
+import ForgotPassword from "./Components/ForgotPassword";
+import ResetPassword from "./Components/ResetPassword";
 import Dashboard from "./Components/User/Dashboard";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminDashboard from "./Components/Admin/AdminDashboard";
@@ -21,6 +23,9 @@ function App() {
         <Routes>
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/reset-password-otp" element={<ForgotPassword />} />
           {/* General Users */}
           <Route element={<ProtectedRoute allowedRoles={["user", "admin"]} />}>
             <Route path="/dashboard" element={<Dashboard />} />
@@ -31,7 +36,7 @@ function App() {
           </Route>
 
           <Route exact path="/" element={<Navigate to="/login" />} />
-          <Route path="*" element={<Navigate to="/register" />} />
+          <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </Router>
     </>

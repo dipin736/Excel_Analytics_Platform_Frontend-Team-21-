@@ -20,7 +20,7 @@ import { BaseUrluser } from "../../endpoint/baseurl";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { AnimatePresence, motion } from "framer-motion";
-import { useAuth } from "../../Context/AuthContext.";
+import { useAuth } from "../../Context/AuthContext.jsx";
 import { useNavigate } from "react-router-dom";
 import UsersManagement from "./UsersManagement";
 

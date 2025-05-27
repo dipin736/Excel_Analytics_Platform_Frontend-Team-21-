@@ -11,7 +11,10 @@ export const AuthProvider = ({ children }) => {
 
   const fetchCurrentUser = async () => {
     try {
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       const res = await axios.get(`${BaseUrl}me/`, {
         headers: {
@@ -23,6 +26,12 @@ export const AuthProvider = ({ children }) => {
         setUser(res.data.data);
       }
     } catch (err) {
+      // If we get a 401, clear the invalid token
+      if (err.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        setToken(null);
+      }
       console.error("Error fetching current user:", err);
     } finally {
       setLoading(false);
