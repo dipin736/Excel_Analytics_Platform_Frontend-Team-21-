@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BaseUrluser } from "../../endpoint/baseurl";
 import DynamicChart from "./DynamicChart";
+import ChartBuilder from "./ChartBuilder";
 import { toast } from "react-toastify";
 import { motion } from 'framer-motion';
 import {
@@ -12,17 +13,24 @@ import {
   FiUser,
   FiX,
   FiBarChart2,FiDownload,
-  FiLoader
+  FiLoader,
+  FiPlus
 } from "react-icons/fi";
-const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
+const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
   const [selectedSheetIndex, setSelectedSheetIndex] = useState(0);
   const [xAxis, setXAxis] = useState("");
   const [yAxis, setYAxis] = useState("");
   const [chartType, setChartType] = useState("bar");
   const [processedData, setProcessedData] = useState([]);
+  const [fullProcessedData, setFullProcessedData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingFullData, setIsLoadingFullData] = useState(false);
   const [error, setError] = useState(null);
   const [apiAnalysisData, setApiAnalysisData] = useState(null);
+  const [showChartBuilder, setShowChartBuilder] = useState(false);
+  const [previewRowCount, setPreviewRowCount] = useState(5);
+  const [maxAvailableRows, setMaxAvailableRows] = useState(15);
+  const [displayData, setDisplayData] = useState([]);
 
   const selectedFile = files?.find((file) => file._id === fileId) || {};
   const sheets = selectedFile?.sheets || [];
@@ -37,7 +45,7 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
         }
 
         const headers = currentSheet.columns || [];
-        const dataRows = currentSheet.previewData.slice(1);
+        const dataRows = currentSheet.previewData.slice(1, parseInt(previewRowCount) + 1);
 
         const formattedData = dataRows
           .map((row) => {
@@ -52,6 +60,7 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
           );
 
         setProcessedData(formattedData);
+        setMaxAvailableRows(currentSheet.previewData.length - 1); // Subtract header row
       } catch (err) {
         setError("Error processing data: " + err.message);
         console.error("Processing error:", err);
@@ -59,7 +68,7 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
     };
 
     processData();
-  }, [currentSheet, xAxis, yAxis]);
+  }, [currentSheet, xAxis, yAxis, previewRowCount]);
 
   // Get column options - MODIFIED VERSION
   const getColumns = () => {
@@ -80,11 +89,70 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
   const columns = getColumns();
   const dataRows = currentSheet.previewData?.slice(1) || [];
 
+  // Function to fetch full data from backend
+  const fetchFullData = async () => {
+    try {
+      setIsLoadingFullData(true);
+      setError(null);
+
+      // Only fetch full data if explicitly analyzing, otherwise use preview count
+      const useFullData = apiAnalysisData !== null;
+      const endpoint = useFullData 
+        ? `${BaseUrluser}/excel/${fileId}/analyze?fullData=true&sheetIndex=${selectedSheetIndex}`
+        : `${BaseUrluser}/excel/${fileId}/preview?limit=${previewRowCount}&sheet=${encodeURIComponent(currentSheet.name)}`;
+
+      const response = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch data");
+
+      const data = await response.json();
+      
+      if (data.success) {
+        const fullData = useFullData ? (data.data.fullData || data.data.rows || data.data) : data.previewData;
+        const headers = data.analytics?.columns || currentSheet.columns || [];
+
+        if (Array.isArray(fullData) && fullData.length > 0) {
+          const formattedFullData = fullData
+            .slice(1, useFullData ? undefined : previewRowCount + 1) // Limit rows if not analyzing
+            .map((row) => {
+              const item = {};
+              if (Array.isArray(row)) {
+                headers.forEach((header, index) => {
+                  item[header] = row[index];
+                });
+              } else if (typeof row === 'object') {
+                return row;
+              }
+              return item;
+            })
+            .filter(
+              (item) => item[xAxis] !== undefined && item[yAxis] !== undefined
+            );
+
+          setFullProcessedData(formattedFullData);
+          return formattedFullData;
+        }
+      }
+      throw new Error("Invalid data format received");
+    } catch (err) {
+      setError("Error fetching data: " + err.message);
+      console.error("Data fetch error:", err);
+      return [];
+    } finally {
+      setIsLoadingFullData(false);
+    }
+  };
+
   const handleAnalyze = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
+      // First fetch the analysis metadata
       const response = await fetch(`${BaseUrluser}/excel/${fileId}/analyze`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -96,7 +164,7 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
       const data = await response.json();
       setApiAnalysisData(data);
 
-      // Auto-select columns if none selected - BUT DON'T CHANGE COLUMN STRUCTURE
+      // Auto-select columns if none selected
       if (!xAxis && data.analytics?.columns?.length > 0) {
         setXAxis(data.analytics.columns[0]);
       }
@@ -105,6 +173,11 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
           (col) => data.analytics.summary[col]?.type === "numeric"
         );
         if (numericCol) setYAxis(numericCol);
+      }
+
+      // Fetch full data for analysis if axes are selected
+      if (xAxis && yAxis) {
+        await fetchFullData();
       }
     } catch (err) {
       setError(err.message || "Failed to analyze data");
@@ -115,11 +188,19 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
 
   useEffect(() => {
     setApiAnalysisData(null);
+    setFullProcessedData([]);
   }, [currentSheet]);
 
+  // Auto-fetch full data when both axes are selected
+  useEffect(() => {
+    if (xAxis && yAxis && apiAnalysisData && fullProcessedData.length === 0) {
+      fetchFullData();
+    }
+  }, [xAxis, yAxis, apiAnalysisData]);
+
   const handleSaveDashboard = async () => {
-    if (!xAxis || !yAxis || processedData.length === 0) {
-      setError(`Please select both X and Y axes and ensure data is available`);
+    if (!xAxis || !yAxis) {
+      setError(`Please select both X and Y axes`);
       return;
     }
 
@@ -127,22 +208,43 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
       setIsLoading(true);
       setError(null);
 
-      const chartTitle = `${xAxis} vs ${yAxis} Chart`; // Generate a default chart title
+      // Use the current data for the chart
+      let dataToUse = processedData;
+      
+      if (dataToUse.length === 0) {
+        setError("No data available for the selected axes");
+        return;
+      }
+
+      const chartTitle = `${xAxis} vs ${yAxis} Chart`;
       const chartDataForPayload = {
-        labels: processedData.map((item) => item[xAxis]),
+        labels: dataToUse.map((item) => item[xAxis]),
         datasets: [
           {
             label: yAxis,
-            data: processedData.map((item) => parseFloat(item[yAxis]) || 0),
+            data: dataToUse.map((item) => parseFloat(item[yAxis]) || 0),
+            backgroundColor: darkMode ? [
+              "rgba(99, 102, 241, 0.8)",
+              "rgba(168, 85, 247, 0.8)",
+              "rgba(236, 72, 153, 0.8)",
+              "rgba(14, 165, 233, 0.8)",
+              "rgba(20, 184, 166, 0.8)",
+            ] : [
+              "rgba(99, 102, 241, 0.6)",
+              "rgba(168, 85, 247, 0.6)",
+              "rgba(236, 72, 153, 0.6)",
+              "rgba(14, 165, 233, 0.6)",
+              "rgba(20, 184, 166, 0.6)",
+            ],
+            borderColor: "rgba(99, 102, 241, 1)",
+            borderWidth: 1,
           },
         ],
       };
 
       const dashboardPayload = {
         title: `Dashboard from ${selectedFile?.originalName || "Excel File"}`,
-        description: `Created from ${
-          selectedFile?.originalName || "Excel File"
-        }`,
+        description: `Analysis of ${xAxis} vs ${yAxis} from ${selectedFile?.originalName || "Excel File"}`,
         charts: [
           {
             title: chartTitle,
@@ -151,10 +253,13 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
             configuration: {
               xAxisLabel: xAxis,
               yAxisLabel: yAxis,
+              fileId: fileId,
+              sheetName: currentSheet.name,
+              darkMode: darkMode,
             },
           },
         ],
-        // isPublic: false, // You can set this based on user preference if needed
+        isPublic: false,
       };
 
       const response = await fetch(`${BaseUrluser}/dashboard`, {
@@ -166,47 +271,256 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
         body: JSON.stringify(dashboardPayload),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to save dashboard");
+        throw new Error(result.error || result.message || "Failed to save dashboard");
       }
 
-      const result = await response.json();
-      toast.success("Dashboard saved successfully!");
-      onClose();
+      if (result.success) {
+        toast.success("Dashboard saved successfully! You can view it in the Dashboards section.");
+        onClose();
+      } else {
+        throw new Error(result.error || "Failed to save dashboard");
+      }
     } catch (err) {
       setError(err.message || "Failed to save dashboard");
-      console.error("Save error:", err);
+      toast.error(err.message || "Failed to save dashboard");
     } finally {
       setIsLoading(false);
     }
   };
   const [layoutMode, setLayoutMode] = useState("split"); 
 
-  const handleDownload = (format) => {
+  const handleDownload = async (format) => {
     if (format === "png") {
       const canvas = document.querySelector("canvas");
-      const url = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `analysis-${Date.now()}.png`;
-      link.click();
+      if (canvas) {
+        const url = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `analysis-${Date.now()}.png`;
+        link.click();
+      } else {
+        setError("No chart available to download");
+      }
     } else if (format === "csv") {
-      const headers = [xAxis, yAxis].join(",");
-      const csvContent = [
-        headers,
-        ...processedData.map((item) => [item[xAxis], item[yAxis]].join(",")),
-      ].join("\n");
+      if (!xAxis || !yAxis) {
+        setError("Please select both X and Y axes before downloading");
+        return;
+      }
 
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `analysis-${Date.now()}.csv`;
-      link.click();
+      try {
+        setIsLoadingFullData(true);
+        
+        // Fetch full data if not already available
+        let dataToUse = fullProcessedData;
+        if (dataToUse.length === 0) {
+          dataToUse = await fetchFullData();
+        }
+
+        if (dataToUse.length === 0) {
+          setError("No data available for download");
+          return;
+        }
+
+        const headers = [xAxis, yAxis].join(",");
+        const csvContent = [
+          headers,
+          ...dataToUse.map((item) => [item[xAxis], item[yAxis]].join(",")),
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `analysis-${Date.now()}.csv`;
+        link.click();
+        
+        toast.success(`Downloaded ${dataToUse.length} rows of data`);
+      } catch (err) {
+        setError("Failed to download data: " + err.message);
+      } finally {
+        setIsLoadingFullData(false);
+      }
     }
   };
 
+  // New dynamic preview data fetching function
+  const fetchPreviewData = async (fileId, limit, sheetName) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${BaseUrluser}/excel/${fileId}/preview?limit=${limit}&sheet=${encodeURIComponent(sheetName)}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch preview data");
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.previewData) {
+        // Update the current sheet's preview data with fresh data
+        const updatedSheets = sheets.map((sheet, index) => {
+          if (index === selectedSheetIndex) {
+            return {
+              ...sheet,
+              previewData: data.previewData,
+              rowCount: data.totalRows || sheet.rowCount
+            };
+          }
+          return sheet;
+        });
+
+        // Update the selectedFile with new sheet data
+        const updatedFile = {
+          ...selectedFile,
+          sheets: updatedSheets
+        };
+
+        // Update files array
+        const updatedFiles = files.map(file => 
+          file._id === fileId ? updatedFile : file
+        );
+
+        // Update parent component's files state if callback provided
+        if (onFilesUpdate) {
+          onFilesUpdate(updatedFiles);
+        }
+
+        // This would need to be passed from parent component
+        // For now, we'll just update local state
+        setMaxAvailableRows(data.previewData.length - 1); // Subtract header row
+        
+        return data.previewData;
+      }
+    } catch (err) {
+      console.error("Error fetching preview data:", err);
+      toast.error("Failed to fetch preview data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update display data whenever preview count or current sheet changes
+  useEffect(() => {
+    if (currentSheet?.previewData) {
+      const newDisplayData = currentSheet.previewData.slice(1, parseInt(previewRowCount) + 1);
+      setDisplayData(newDisplayData);
+
+      // Also update the processed data for the chart
+      if (xAxis && yAxis) {
+        const headers = currentSheet.columns || [];
+        const formattedData = newDisplayData
+          .map((row) => {
+            const item = {};
+            headers.forEach((header, index) => {
+              item[header] = row[index];
+            });
+            return item;
+          })
+          .filter(
+            (item) => item[xAxis] !== undefined && item[yAxis] !== undefined
+          );
+
+        setProcessedData(formattedData);
+      }
+    }
+  }, [currentSheet, previewRowCount, xAxis, yAxis]);
+
+  // Enhanced preview row count handler
+  const handlePreviewRowCountChange = async (newCount) => {
+    const parsedCount = parseInt(newCount);
+    setPreviewRowCount(parsedCount);
+    
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${BaseUrluser}/excel/${fileId}/preview?limit=${parsedCount}&sheet=${encodeURIComponent(currentSheet.name)}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch preview data");
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.previewData) {
+        // Update sheets with new data
+        const updatedSheets = sheets.map((sheet, index) => {
+          if (index === selectedSheetIndex) {
+            return {
+              ...sheet,
+              previewData: data.previewData,
+              rowCount: data.totalRows || sheet.rowCount
+            };
+          }
+          return sheet;
+        });
+
+        // Update files
+        const updatedFile = {
+          ...selectedFile,
+          sheets: updatedSheets
+        };
+
+        const updatedFiles = files.map(file => 
+          file._id === fileId ? updatedFile : file
+        );
+
+        if (onFilesUpdate) {
+          onFilesUpdate(updatedFiles);
+        }
+
+        // Get the preview data slice
+        const newPreviewData = data.previewData.slice(1, parsedCount + 1);
+        
+        // Update display data for table
+        setDisplayData(newPreviewData);
+        
+        // Update processed data for chart
+        if (xAxis && yAxis) {
+          const headers = currentSheet.columns || [];
+          const formattedData = newPreviewData
+            .map((row) => {
+              const item = {};
+              headers.forEach((header, index) => {
+                item[header] = row[index];
+              });
+              return item;
+            })
+            .filter(
+              (item) => item[xAxis] !== undefined && item[yAxis] !== undefined
+            );
+          setProcessedData(formattedData);
+        }
+        
+        setMaxAvailableRows(data.previewData.length - 1);
+      }
+    } catch (err) {
+      console.error("Error updating preview data:", err);
+      toast.error("Failed to update preview data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update maxAvailableRows when dataRows changes
+  useEffect(() => {
+    setMaxAvailableRows(dataRows.length);
+  }, [dataRows.length]);
+
+  // Auto-fetch fresh preview data when sheet changes or component mounts
+  useEffect(() => {
+    if (currentSheet.name && fileId && previewRowCount) {
+      fetchPreviewData(fileId, previewRowCount, currentSheet.name);
+    }
+  }, [selectedSheetIndex, fileId]);
 
     return (
       <motion.div 
@@ -333,7 +647,11 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
               </label>
               <select
                 value={xAxis}
-                onChange={(e) => setXAxis(e.target.value)}
+                onChange={(e) => {
+                  setXAxis(e.target.value);
+                  setPreviewRowCount(5);
+                  handlePreviewRowCountChange(5);
+                }}
                 className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
                   darkMode 
                     ? 'bg-gray-700/80 border-gray-600 text-gray-200' 
@@ -355,7 +673,11 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
               </label>
               <select
                 value={yAxis}
-                onChange={(e) => setYAxis(e.target.value)}
+                onChange={(e) => {
+                  setYAxis(e.target.value);
+                  setPreviewRowCount(5);
+                  handlePreviewRowCountChange(5);
+                }}
                 className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
                   darkMode 
                     ? 'bg-gray-700/80 border-gray-600 text-gray-200' 
@@ -473,18 +795,165 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
             </motion.div>
           )}
     
-          {/* Data Preview */}
-          {dataRows.length > 0 && (layoutMode === "split" || layoutMode === "table") && (
+          {/* Split View Layout */}
+          {layoutMode === "split" && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+              {/* Data Preview - Left Side */}
+              {dataRows.length > 0 && (
+                <motion.div 
+                  className="space-y-4"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className={`text-lg font-semibold ${
+                      darkMode ? 'text-gray-100' : 'text-gray-800'
+                    }`}>
+                      Data Preview
+                    </h3>
+                    <div className="flex items-center space-x-3">
+                      <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Showing {Math.min(previewRowCount, dataRows.length)} of {currentSheet.rowCount || dataRows.length} rows
+                      </span>
+                      <select
+                        value={previewRowCount}
+                        onChange={(e) => handlePreviewRowCountChange(e.target.value)}
+                        className={`text-sm px-2 py-1 border rounded ${
+                          darkMode 
+                            ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                            : 'bg-white border-gray-300 text-gray-700'
+                        }`}
+                      >
+                        <option value={5}>5 rows</option>
+                        <option value={10}>10 rows</option>
+                        <option value={15}>15 rows</option>
+                        <option value={20}>20 rows</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className={`overflow-auto rounded-xl shadow-sm border h-96 ${
+                    darkMode ? 'border-gray-600' : 'border-gray-200/50'
+                  }`}>
+                    <table className="min-w-full divide-y divide-gray-200/50">
+                      <thead className={`sticky top-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-50/80'}`}>
+                        <tr>
+                          {columns.map((col) => (
+                            <th
+                              key={`header-${col.key}`}
+                              className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                                darkMode ? 'text-gray-300' : 'text-gray-500'
+                              }`}
+                            >
+                              {col.name}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${
+                        darkMode ? 'divide-gray-600 bg-gray-700/50' : 'divide-gray-200/50 bg-white/80'
+                      }`}>
+                        {displayData.map((row, rowIndex) => (
+                          <tr 
+                            key={`row-${rowIndex}`} 
+                            className={darkMode ? 'hover:bg-gray-600/50' : 'hover:bg-gray-50/50'}
+                          >
+                            {columns.map((col) => (
+                              <td
+                                key={`cell-${rowIndex}-${col.key}`}
+                                className={`px-4 py-3 whitespace-nowrap text-sm ${
+                                  darkMode ? 'text-gray-200' : 'text-gray-700'
+                                }`}
+                              >
+                                {row[col.index]?.toString() || (
+                                  <span className={darkMode ? 'text-gray-400' : 'text-gray-400'}>
+                                    null
+                                  </span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {dataRows.length > previewRowCount && (
+                    <div className={`text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {dataRows.length - previewRowCount} more rows available. Use "Analyze Data" to process all rows.
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Chart Preview - Right Side */}
+              {xAxis && yAxis && processedData.length > 0 && (
+                <motion.div 
+                  className="space-y-4"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className={`text-lg font-semibold ${
+                      darkMode ? 'text-gray-100' : 'text-gray-800'
+                    }`}>
+                      Chart Preview
+                    </h3>
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-sm px-2 py-1 rounded-full ${
+                        darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
+                      }`}>
+                        Showing {Math.min(previewRowCount, processedData.length)} rows
+                      </span>
+                    </div>
+                  </div>
+                  <div className={`h-96 w-full rounded-xl border shadow-sm p-4 ${
+                    darkMode ? 'bg-gray-700/80 border-gray-600' : 'bg-white/80 border-gray-200/50'
+                  }`}>
+                    <DynamicChart
+                      data={processedData.slice(0, previewRowCount)}
+                      chartType={chartType}
+                      xAxis={xAxis}
+                      yAxis={yAxis}
+                      darkMode={darkMode}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          )}
+
+          {/* Table Only View */}
+          {dataRows.length > 0 && layoutMode === "table" && (
             <motion.div 
               className="mb-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <h3 className={`text-lg font-semibold mb-3 ${
-                darkMode ? 'text-gray-100' : 'text-gray-800'
-              }`}>
-                Data Preview
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`text-lg font-semibold ${
+                  darkMode ? 'text-gray-100' : 'text-gray-800'
+                }`}>
+                  Data Preview
+                </h3>
+                <div className="flex items-center space-x-3">
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Showing {Math.min(previewRowCount, dataRows.length)} of {currentSheet.rowCount || dataRows.length} rows
+                  </span>
+                  <select
+                    value={previewRowCount}
+                    onChange={(e) => handlePreviewRowCountChange(e.target.value)}
+                    className={`text-sm px-2 py-1 border rounded ${
+                      darkMode 
+                        ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                        : 'bg-white border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    <option value={5}>5 rows</option>
+                    <option value={10}>10 rows</option>
+                    <option value={25}>25 rows</option>
+                    <option value={50}>50 rows</option>
+                  </select>
+                </div>
+              </div>
               <div className={`overflow-auto rounded-xl shadow-sm border ${
                 darkMode ? 'border-gray-600' : 'border-gray-200/50'
               }`}>
@@ -506,7 +975,7 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
                   <tbody className={`divide-y ${
                     darkMode ? 'divide-gray-600 bg-gray-700/50' : 'divide-gray-200/50 bg-white/80'
                   }`}>
-                    {dataRows.slice(0, 5).map((row, rowIndex) => (
+                    {displayData.map((row, rowIndex) => (
                       <tr 
                         key={`row-${rowIndex}`} 
                         className={darkMode ? 'hover:bg-gray-600/50' : 'hover:bg-gray-50/50'}
@@ -530,26 +999,57 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
                   </tbody>
                 </table>
               </div>
+              {dataRows.length > previewRowCount && (
+                <div className={`mt-2 text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {dataRows.length - previewRowCount} more rows available. Use "Analyze Data" to process all rows.
+                </div>
+              )}
             </motion.div>
           )}
-    
-          {/* Chart Display */}
-          {xAxis && yAxis && processedData.length > 0 && (layoutMode === "split" || layoutMode === "chart") && (
+
+          {/* Chart Only View */}
+          {xAxis && yAxis && (processedData.length > 0 || fullProcessedData.length > 0) && layoutMode === "chart" && (
             <motion.div 
               className="mb-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <h3 className={`text-lg font-semibold mb-3 ${
-                darkMode ? 'text-gray-100' : 'text-gray-800'
-              }`}>
-                Chart Preview
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`text-lg font-semibold ${
+                  darkMode ? 'text-gray-100' : 'text-gray-800'
+                }`}>
+                  Chart Preview
+                </h3>
+                <div className="flex items-center space-x-2">
+                  {fullProcessedData.length > 0 && (
+                    <span className={`text-sm px-2 py-1 rounded-full ${
+                      darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
+                    }`}>
+                      Full Data: {fullProcessedData.length} rows
+                    </span>
+                  )}
+                  {processedData.length > 0 && fullProcessedData.length === 0 && (
+                    <span className={`text-sm px-2 py-1 rounded-full ${
+                      darkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      Preview: {processedData.length} rows
+                    </span>
+                  )}
+                  {isLoadingFullData && (
+                    <span className={`text-sm px-2 py-1 rounded-full flex items-center ${
+                      darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      <FiLoader className="animate-spin mr-1" size={12} />
+                      Loading full data...
+                    </span>
+                  )}
+                </div>
+              </div>
               <div className={`h-96 w-full rounded-xl border shadow-sm p-4 ${
                 darkMode ? 'bg-gray-700/80 border-gray-600' : 'bg-white/80 border-gray-200/50'
               }`}>
                 <DynamicChart
-                  data={processedData}
+                  data={fullProcessedData.length > 0 ? fullProcessedData : processedData}
                   chartType={chartType}
                   xAxis={xAxis}
                   yAxis={yAxis}
@@ -564,22 +1064,36 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
             darkMode ? 'border-gray-700' : 'border-gray-200/50'
           }`}>
             <div className="flex flex-wrap gap-2 mr-auto">
-              <button
-                onClick={() => handleDownload("png")}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center transition-colors ${
-                  darkMode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-500 hover:bg-blue-600'
-                } text-white`}
-              >
-                <FiDownload className="mr-1.5" /> PNG
-              </button>
-              <button
-                onClick={() => handleDownload("csv")}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center transition-colors ${
-                  darkMode ? 'bg-green-600 hover:bg-green-500' : 'bg-green-500 hover:bg-green-600'
-                } text-white`}
-              >
-                <FiDownload className="mr-1.5" /> CSV
-              </button>
+                          <button
+              onClick={() => handleDownload("png")}
+              disabled={isLoadingFullData || !xAxis || !yAxis}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center transition-colors ${
+                isLoadingFullData || !xAxis || !yAxis
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : darkMode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-500 hover:bg-blue-600'
+              } text-white`}
+            >
+              <FiDownload className="mr-1.5" /> PNG
+            </button>
+            <button
+              onClick={() => handleDownload("csv")}
+              disabled={isLoadingFullData || !xAxis || !yAxis}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center transition-colors ${
+                isLoadingFullData || !xAxis || !yAxis
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : darkMode ? 'bg-green-600 hover:bg-green-500' : 'bg-green-500 hover:bg-green-600'
+              } text-white`}
+            >
+              {isLoadingFullData ? (
+                <>
+                  <FiLoader className="animate-spin mr-1.5" /> Loading...
+                </>
+              ) : (
+                <>
+                  <FiDownload className="mr-1.5" /> CSV
+                </>
+              )}
+            </button>
             </div>
     
             <button
@@ -618,9 +1132,9 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
     
             <button
               onClick={handleSaveDashboard}
-              disabled={isLoading || !xAxis || !yAxis || processedData.length === 0}
+              disabled={isLoading || isLoadingFullData || !xAxis || !yAxis}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                isLoading || !xAxis || !yAxis || processedData.length === 0
+                isLoading || isLoadingFullData || !xAxis || !yAxis
                   ? darkMode 
                     ? 'bg-green-800 text-gray-400 cursor-not-allowed' 
                     : 'bg-green-300 text-white cursor-not-allowed'
@@ -629,9 +1143,38 @@ const FileAnalyzer = ({ fileId, onClose, files,darkMode }) => {
                     : 'bg-green-600 hover:bg-green-700 text-white'
               }`}
             >
-              Save to Dashboard
+              {isLoading || isLoadingFullData ? (
+                <span className="flex items-center">
+                  <FiLoader className="animate-spin mr-2" /> 
+                  {isLoadingFullData ? 'Loading Data...' : 'Saving...'}
+                </span>
+              ) : (
+                'Save to Dashboard'
+              )}
+            </button>
+
+            <button
+              onClick={() => setShowChartBuilder(true)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+                darkMode 
+                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white' 
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              }`}
+            >
+              <FiPlus />
+              <span>Advanced Chart Builder</span>
             </button>
           </div>
+
+          {/* Chart Builder Modal */}
+          {showChartBuilder && (
+            <ChartBuilder
+              excelId={fileId}
+              dashboardId="temp-dashboard" // This should be passed from parent or fetched
+              onClose={() => setShowChartBuilder(false)}
+              darkMode={darkMode}
+            />
+          )}
         </motion.div>
       </motion.div>
     );

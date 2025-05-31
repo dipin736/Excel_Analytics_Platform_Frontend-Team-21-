@@ -215,7 +215,7 @@ const Dashboard = () => {
 
       const result = await response.json();
 
-      console.log("API Response:", result);
+      // console.log("API Response:", result); // Remove console log for production
 
       if (result.success && result.data) {
         if (Array.isArray(result.data)) {
@@ -537,7 +537,7 @@ const Dashboard = () => {
 
 // Define some simple keyframe animations with Tailwind CSS in JS
 const TailwindAnimations = () => (
-<style jsx global>{`
+<style>{`
   @keyframes spin-slow {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }

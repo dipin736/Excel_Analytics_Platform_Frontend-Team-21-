@@ -552,7 +552,7 @@ const Register = () => {
   </div>
 
   {/* CSS animations */}
-  <style jsx global>{`
+  <style>{`
     @keyframes gradient-shift {
       0% {
         background-position: 0% 50%;
