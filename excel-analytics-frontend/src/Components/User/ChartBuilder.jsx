@@ -14,27 +14,36 @@ import {
   FiX,
   FiLoader,
   FiAlertCircle,
-  FiCheck
+  FiCheck,
+  FiBox
 } from 'react-icons/fi';
 import DynamicChart from './DynamicChart';
 import {
-  getChartMetadata,
-  getChartData,
   saveChartConfiguration,
   validateChartConfig,
   formatChartDataForChartJS
 } from '../../services/chartApi';
 
-const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
+const ChartBuilder = ({ 
+  excelId, 
+  dashboardId, 
+  onClose, 
+  darkMode,
+  sheets = [],
+  currentSheet,
+  selectedSheetIndex = 0,
+  columns = [],
+  processedData = [],
+  apiAnalysisData = null
+}) => {
   // State management
-  const [metadata, setMetadata] = useState(null);
   const [chartConfig, setChartConfig] = useState({
     title: '',
     chartType: 'bar',
     xAxis: '',
     yAxis: '',
     zAxis: '',
-    sheetIndex: 0,
+    sheetIndex: selectedSheetIndex,
     description: '',
     settings: {
       showLegend: true,
@@ -45,32 +54,72 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
   });
   const [chartData, setChartData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingData, setIsLoadingData] = useState(false);
   const [error, setError] = useState(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
 
-  // Chart type options
+  // Add new state variables for row control
+  const [previewRowCount, setPreviewRowCount] = useState(5);
+  const [maxAvailableRows, setMaxAvailableRows] = useState(processedData.length);
+  const [displayData, setDisplayData] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+
+  // Add new state variables for chart controls
+  const [chartControls, setChartControls] = useState({
+    showLegend: true,
+    showGrid: true,
+    enableAnimation: true,
+    stackedData: false,
+    aspectRatio: 2,
+    borderWidth: 1,
+    tension: 0.4,
+    pointRadius: 3,
+  });
+
+  // Enhanced chart types including professional Excel-style charts
   const chartTypes = [
+    // Basic Charts
     { type: 'bar', label: 'Bar Chart', icon: FiBarChart2, color: 'bg-blue-500' },
+    { type: 'column', label: 'Column Chart', icon: FiBarChart2, color: 'bg-blue-600' },
     { type: 'line', label: 'Line Chart', icon: FiTrendingUp, color: 'bg-green-500' },
-    { type: 'pie', label: 'Pie Chart', icon: FiPieChart, color: 'bg-purple-500' },
-    { type: 'scatter', label: 'Scatter Plot', icon: FiCircle, color: 'bg-orange-500' },
     { type: 'area', label: 'Area Chart', icon: FiTrendingUp, color: 'bg-teal-500' },
-    { type: 'doughnut', label: 'Doughnut', icon: FiPieChart, color: 'bg-pink-500' }
+    { type: 'scatter', label: 'Scatter Plot', icon: FiCircle, color: 'bg-orange-500' },
+    
+    // Pie Charts
+    { type: 'pie', label: 'Pie Chart', icon: FiPieChart, color: 'bg-purple-500' },
+    { type: '3d-pie', label: '3D Pie Chart', icon: FiPieChart, color: 'bg-purple-600' },
+    { type: 'doughnut', label: 'Doughnut', icon: FiPieChart, color: 'bg-pink-500' },
+    
+    // 3D Charts
+    { type: '3d-bar', label: '3D Bar', icon: FiBox, color: 'bg-indigo-500' },
+    { type: '3d-column', label: '3D Column', icon: FiBox, color: 'bg-indigo-600' },
+    { type: '3d-scatter', label: '3D Scatter', icon: FiCircle, color: 'bg-violet-500' },
+    
+    // Advanced Professional Charts
+    { type: 'waterfall', label: 'Waterfall Chart', icon: FiTrendingUp, color: 'bg-cyan-500' },
+    { type: 'funnel', label: 'Funnel Chart', icon: FiTrendingUp, color: 'bg-yellow-500' },
+    { type: 'gauge', label: 'Gauge/Dial Chart', icon: FiCircle, color: 'bg-red-500' },
+    { type: 'arc', label: 'Arc Chart', icon: FiCircle, color: 'bg-emerald-500' },
+    { type: 'radar', label: 'Radar Chart', icon: FiCircle, color: 'bg-lime-500' },
+    { type: 'bubble', label: 'Bubble Chart', icon: FiCircle, color: 'bg-sky-500' },
+    { type: 'heatmap', label: 'Heat Map', icon: FiBox, color: 'bg-rose-500' },
+    { type: 'treemap', label: 'Tree Map', icon: FiBox, color: 'bg-amber-500' }
   ];
 
-  // Load chart metadata on component mount
-  useEffect(() => {
-    loadChartMetadata();
-  }, [excelId]);
+  // Add chart style presets
+  const chartStylePresets = [
+    { name: 'Default', theme: 'default' },
+    { name: 'Neon', theme: 'neon' },
+    { name: 'Pastel', theme: 'pastel' },
+    { name: 'Monochrome', theme: 'monochrome' },
+  ];
 
-  // Load chart data when configuration changes
+  // Process data when configuration changes
   useEffect(() => {
-    if (chartConfig.xAxis && chartConfig.yAxis && chartConfig.chartType) {
-      loadChartData();
+    if (chartConfig.xAxis && chartConfig.yAxis && processedData.length > 0) {
+      processChartData();
     }
-  }, [chartConfig.xAxis, chartConfig.yAxis, chartConfig.zAxis, chartConfig.chartType, chartConfig.sheetIndex]);
+  }, [chartConfig.xAxis, chartConfig.yAxis, chartConfig.chartType, processedData]);
 
   // Validate configuration when it changes
   useEffect(() => {
@@ -78,86 +127,198 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
     setValidationErrors(validation.errors);
   }, [chartConfig]);
 
-  const loadChartMetadata = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await getChartMetadata(excelId);
-      if (result.success) {
-        setMetadata(result.data);
-        // Auto-select first available columns if none selected
-        if (result.data.fields && result.data.fields.length > 0) {
-          setChartConfig(prev => ({
-            ...prev,
-            xAxis: prev.xAxis || result.data.fields[0].name,
-            yAxis: prev.yAxis || (result.data.fields.find(f => f.type === 'numeric')?.name || result.data.fields[1]?.name)
-          }));
-        }
-      } else {
-        setError(result.error);
-        toast.error('Failed to load chart metadata');
-      }
-    } catch (err) {
-      setError(err.message);
-      toast.error('Error loading chart metadata');
-    } finally {
-      setIsLoading(false);
+  // Add useEffect for handling display data
+  useEffect(() => {
+    if (processedData.length > 0) {
+      setMaxAvailableRows(processedData.length);
+      setDisplayData(processedData.slice(0, previewRowCount));
     }
-  };
+  }, [processedData, previewRowCount]);
 
-  const loadChartData = async () => {
-    if (!chartConfig.xAxis || !chartConfig.yAxis) return;
-
-    setIsLoadingData(true);
-    setError(null);
-
+  const processChartData = () => {
     try {
-      const params = {
-        chartType: chartConfig.chartType,
-        xAxis: chartConfig.xAxis,
-        yAxis: chartConfig.yAxis,
-        zAxis: chartConfig.zAxis,
-        sheetIndex: chartConfig.sheetIndex.toString()
+      if (!chartConfig.xAxis || !chartConfig.yAxis || processedData.length === 0) {
+        setChartData(null);
+        return;
+      }
+
+      const dataSlice = processedData.slice(0, previewRowCount);
+      const colors = getThemeColors(chartConfig.theme || 'default', darkMode, dataSlice.length);
+
+      let formattedData;
+      
+      if (chartConfig.chartType.startsWith('3d')) {
+        // Handle 3D chart data
+        formattedData = {
+          labels: dataSlice.map(item => item[chartConfig.xAxis]),
+          datasets: [{
+            label: `${chartConfig.yAxis} vs ${chartConfig.zAxis || 'Z'}`,
+            data: dataSlice.map(item => ({
+              x: parseFloat(item[chartConfig.xAxis]) || 0,
+              y: parseFloat(item[chartConfig.yAxis]) || 0,
+              z: parseFloat(item[chartConfig.zAxis]) || 0
+            })),
+            backgroundColor: colors.background[0],
+            borderColor: colors.border
+          }]
+        };
+      } else {
+        // Keep existing 2D chart data formatting
+        formattedData = {
+          labels: dataSlice.map(item => item[chartConfig.xAxis]),
+          datasets: [{
+            label: chartConfig.yAxis,
+            data: dataSlice.map(item => item[chartConfig.yAxis]),
+            backgroundColor: colors.background,
+            borderColor: colors.border,
+            borderWidth: chartControls.borderWidth,
+            tension: chartControls.tension,
+            pointRadius: chartControls.pointRadius,
+            fill: chartConfig.chartType === 'area'
+          }]
+        };
+      }
+
+      const options = {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: chartControls.aspectRatio,
+        animation: {
+          duration: chartControls.enableAnimation ? 750 : 0
+        },
+        plugins: {
+          legend: {
+            display: chartControls.showLegend
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: chartControls.showGrid
+            }
+          },
+          y: {
+            grid: {
+              display: chartControls.showGrid
+            },
+            stacked: chartControls.stackedData
+          },
+          ...(chartConfig.chartType.startsWith('3d') && {
+            z: {
+              grid: {
+                display: chartControls.showGrid
+              }
+            }
+          })
+        }
       };
 
-      const result = await getChartData(excelId, params);
-      if (result.success) {
-        const formattedData = formatChartDataForChartJS(result.data, chartConfig.chartType);
-        setChartData(formattedData);
-      } else {
-        setError(result.error);
-        toast.error('Failed to load chart data');
-      }
+      setChartData({ ...formattedData, options });
+      setError(null);
     } catch (err) {
-      setError(err.message);
-      toast.error('Error loading chart data');
-    } finally {
-      setIsLoadingData(false);
+      setError('Error processing chart data: ' + err.message);
+      toast.error('Error processing chart data');
     }
   };
 
-  const handleConfigChange = (field, value) => {
-    setChartConfig(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSettingsChange = (setting, value) => {
-    setChartConfig(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        [setting]: value
+  // Add color theme function
+  const getThemeColors = (theme, darkMode, count) => {
+    const themes = {
+      default: {
+        background: darkMode ? [
+          "rgba(99, 102, 241, 0.8)",
+          "rgba(168, 85, 247, 0.8)",
+          "rgba(236, 72, 153, 0.8)",
+          "rgba(14, 165, 233, 0.8)",
+          "rgba(20, 184, 166, 0.8)",
+        ] : [
+          "rgba(99, 102, 241, 0.6)",
+          "rgba(168, 85, 247, 0.6)",
+          "rgba(236, 72, 153, 0.6)",
+          "rgba(14, 165, 233, 0.6)",
+          "rgba(20, 184, 166, 0.6)",
+        ],
+        border: "rgba(99, 102, 241, 1)"
+      },
+      neon: {
+        background: [
+          "rgba(0, 255, 255, 0.7)",
+          "rgba(255, 0, 255, 0.7)",
+          "rgba(255, 255, 0, 0.7)",
+          "rgba(0, 255, 0, 0.7)",
+          "rgba(255, 128, 0, 0.7)"
+        ],
+        border: "rgba(255, 255, 255, 1)"
+      },
+      pastel: {
+        background: [
+          "rgba(255, 182, 193, 0.7)",
+          "rgba(173, 216, 230, 0.7)",
+          "rgba(255, 218, 185, 0.7)",
+          "rgba(176, 224, 230, 0.7)",
+          "rgba(221, 160, 221, 0.7)"
+        ],
+        border: "rgba(169, 169, 169, 1)"
+      },
+      monochrome: {
+        background: Array(count).fill().map((_, i) => 
+          `rgba(128, 128, 128, ${0.3 + (i * 0.1)})`
+        ),
+        border: "rgba(128, 128, 128, 1)"
       }
+    };
+
+    return themes[theme] || themes.default;
+  };
+
+  // Add style preset handler
+  const handleStylePresetChange = (theme) => {
+    setChartConfig(prev => ({
+      ...prev,
+      theme
     }));
   };
 
+  // Modified validation to include Z-axis for 3D charts
+  const validateConfiguration = () => {
+    const errors = [];
+    
+    if (!chartConfig.title?.trim()) {
+      errors.push("Chart title is required");
+    }
+    
+    if (!chartConfig.xAxis) {
+      errors.push("X-axis selection is required");
+    }
+    
+    if (!chartConfig.yAxis) {
+      errors.push("Y-axis selection is required");
+    }
+
+    if (chartConfig.chartType.startsWith('3d') && !chartConfig.zAxis) {
+      errors.push("Z-axis selection is required for 3D charts");
+    }
+
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  // Update handleConfigChange to include validation
+  const handleConfigChange = (field, value) => {
+    const newConfig = {
+      ...chartConfig,
+      [field]: value
+    };
+    setChartConfig(newConfig);
+    
+    // Validate after a short delay to avoid too frequent validation
+    setTimeout(() => validateConfiguration(), 300);
+  };
+
+  // Add validation check before save
   const handleSaveChart = async () => {
-    const validation = validateChartConfig(chartConfig);
-    if (!validation.isValid) {
-      toast.error('Please fix validation errors before saving');
+    if (!validateConfiguration()) {
+      toast.error("Please fix configuration errors before saving");
       return;
     }
 
@@ -190,10 +351,6 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
     }
   };
 
-  const handleRefreshData = () => {
-    loadChartData();
-  };
-
   const handleExportChart = (format) => {
     if (format === 'png') {
       const canvas = document.querySelector('canvas');
@@ -215,7 +372,22 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
     }
   };
 
-  if (isLoading && !metadata) {
+  // Add row count handler
+  const handlePreviewRowCountChange = (newCount) => {
+    const count = parseInt(newCount);
+    setPreviewRowCount(count);
+    setDisplayData(processedData.slice(0, count));
+  };
+
+  // Add chart control handler
+  const handleChartControlChange = (control, value) => {
+    setChartControls(prev => ({
+      ...prev,
+      [control]: value
+    }));
+  };
+
+  if (isLoading && !chartData) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
@@ -282,6 +454,29 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
           </div>
         </div>
 
+        {/* Add Validation Errors Display */}
+        {validationErrors.length > 0 && (
+          <motion.div 
+            className={`mx-6 mb-4 p-4 rounded-lg border ${
+              darkMode 
+                ? 'bg-red-900/30 border-red-800/50 text-red-200' 
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center mb-2">
+              <FiAlertCircle className="mr-2" />
+              <h4 className="font-medium">Configuration Issues</h4>
+            </div>
+            <ul className="space-y-1 text-sm ml-6 list-disc">
+              {validationErrors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+
         <div className="flex h-[calc(95vh-120px)]">
           {/* Configuration Panel */}
           <AnimatePresence>
@@ -303,20 +498,27 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
                     
                     {/* Chart Title */}
                     <div className="mb-4">
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Chart Title
+                      <label className={`block text-sm font-medium mb-2 ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Chart Title <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        value={chartConfig.title}
+                        value={chartConfig.title || ''}
                         onChange={(e) => handleConfigChange('title', e.target.value)}
                         placeholder="Enter chart title"
-                        className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
-                          darkMode
-                            ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400'
-                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                        className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
+                          !chartConfig.title && validationErrors.includes("Chart title is required")
+                            ? 'border-red-500 bg-red-50/10'
+                            : darkMode
+                              ? 'bg-gray-700/80 border-gray-600 text-gray-200'
+                              : 'bg-white/80 border-gray-200 text-gray-700'
                         }`}
                       />
+                      {!chartConfig.title && validationErrors.includes("Chart title is required") && (
+                        <p className="mt-1 text-sm text-red-500">Please enter a chart title</p>
+                      )}
                     </div>
 
                     {/* Chart Type Selection */}
@@ -324,180 +526,442 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
                       <label className={`block text-sm font-medium mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         Chart Type
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {chartTypes.map(({ type, label, icon: Icon, color }) => (
-                          <motion.button
-                            key={type}
-                            onClick={() => handleConfigChange('chartType', type)}
-                            className={`p-3 rounded-lg border-2 transition-all ${
-                              chartConfig.chartType === type
-                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
-                                : darkMode
-                                ? 'border-gray-600 hover:border-gray-500 bg-gray-700/50'
-                                : 'border-gray-200 hover:border-gray-300 bg-white'
-                            }`}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <Icon className={`h-5 w-5 mx-auto mb-1 ${
-                              chartConfig.chartType === type ? 'text-indigo-600' : darkMode ? 'text-gray-300' : 'text-gray-600'
-                            }`} />
-                            <span className={`text-xs font-medium ${
-                              chartConfig.chartType === type ? 'text-indigo-600' : darkMode ? 'text-gray-300' : 'text-gray-600'
-                            }`}>
-                              {label}
-                            </span>
-                          </motion.button>
-                        ))}
+                      
+                      {/* 2D Charts Section */}
+                      <div className="mb-3">
+                        <h4 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          2D Charts
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {chartTypes.filter(chart => !chart.type.startsWith('3d')).map(({ type, label, icon: Icon }) => (
+                            <motion.button
+                              key={type}
+                              onClick={() => handleConfigChange('chartType', type)}
+                              className={`p-3 rounded-lg border-2 transition-all ${
+                                chartConfig.chartType === type
+                                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
+                                  : darkMode
+                                  ? 'border-gray-600 hover:border-gray-500 bg-gray-700/50'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              }`}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                            >
+                              <Icon className={`h-5 w-5 mx-auto mb-1 ${
+                                chartConfig.chartType === type ? 'text-indigo-600' : darkMode ? 'text-gray-300' : 'text-gray-600'
+                              }`} />
+                              <span className={`text-xs font-medium ${
+                                chartConfig.chartType === type ? 'text-indigo-600' : darkMode ? 'text-gray-300' : 'text-gray-600'
+                              }`}>
+                                {label}
+                              </span>
+                            </motion.button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 3D Charts Section */}
+                      <div>
+                        <h4 className={`text-sm font-medium mb-2 flex items-center ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          3D Charts
+                          <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30">
+                            New
+                          </span>
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {chartTypes.filter(chart => chart.type.startsWith('3d')).map(({ type, label, icon: Icon }) => (
+                            <motion.button
+                              key={type}
+                              onClick={() => handleConfigChange('chartType', type)}
+                              className={`p-3 rounded-lg border-2 transition-all ${
+                                chartConfig.chartType === type
+                                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
+                                  : darkMode
+                                  ? 'border-gray-600 hover:border-gray-500 bg-gray-700/50'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              }`}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                            >
+                              <Icon className={`h-5 w-5 mx-auto mb-1 ${
+                                chartConfig.chartType === type ? 'text-indigo-600' : darkMode ? 'text-gray-300' : 'text-gray-600'
+                              }`} />
+                              <span className={`text-xs font-medium ${
+                                chartConfig.chartType === type ? 'text-indigo-600' : darkMode ? 'text-gray-300' : 'text-gray-600'
+                              }`}>
+                                {label}
+                              </span>
+                            </motion.button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Axis Configuration */}
-                  {metadata && metadata.fields && (
+                  {sheets && sheets.length > 1 && (
                     <div>
                       <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
                         Axis Configuration
                       </h3>
                       
                       {/* Sheet Selection */}
-                      {metadata.sheets && metadata.sheets.length > 1 && (
-                        <div className="mb-4">
-                          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Sheet
-                          </label>
-                          <select
-                            value={chartConfig.sheetIndex}
-                            onChange={(e) => handleConfigChange('sheetIndex', parseInt(e.target.value))}
-                            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
-                              darkMode
-                                ? 'bg-gray-700 border-gray-600 text-gray-200'
-                                : 'bg-white border-gray-300 text-gray-900'
-                            }`}
-                          >
-                            {metadata.sheets.map((sheet, index) => (
-                              <option key={index} value={index}>
-                                {sheet.name} ({sheet.rowCount} rows)
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      {/* X-Axis */}
                       <div className="mb-4">
                         <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          X-Axis (Categories)
+                          Sheet
                         </label>
                         <select
-                          value={chartConfig.xAxis}
-                          onChange={(e) => handleConfigChange('xAxis', e.target.value)}
+                          value={chartConfig.sheetIndex}
+                          onChange={(e) => handleConfigChange('sheetIndex', parseInt(e.target.value))}
                           className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
                             darkMode
                               ? 'bg-gray-700 border-gray-600 text-gray-200'
                               : 'bg-white border-gray-300 text-gray-900'
                           }`}
                         >
-                          <option value="">Select X-Axis</option>
-                          {metadata.fields.map((field) => (
-                            <option key={field.name} value={field.name}>
-                              {field.name} ({field.type}) {field.type === 'numeric' ? '🔢' : '🔤'}
+                          {sheets.map((sheet, index) => (
+                            <option key={index} value={index}>
+                              {sheet.name} ({sheet.rowCount} rows)
                             </option>
                           ))}
                         </select>
                       </div>
 
+                      {/* X-Axis */}
+                      <div className="mb-4">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          darkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          X-Axis <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={chartConfig.xAxis || ''}
+                          onChange={(e) => handleConfigChange('xAxis', e.target.value)}
+                          className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
+                            !chartConfig.xAxis && validationErrors.includes("X-axis selection is required")
+                              ? 'border-red-500 bg-red-50/10'
+                              : darkMode
+                                ? 'bg-gray-700/80 border-gray-600 text-gray-200'
+                                : 'bg-white/80 border-gray-200 text-gray-700'
+                          }`}
+                        >
+                          <option value="">Select X-Axis</option>
+                          {columns.map((field) => (
+                            <option key={`x-${field.name}`} value={field.name}>
+                              {field.name} ({field.type}) {field.type === 'numeric' ? '🔢' : '🔤'}
+                            </option>
+                          ))}
+                        </select>
+                        {!chartConfig.xAxis && validationErrors.includes("X-axis selection is required") && (
+                          <p className="mt-1 text-sm text-red-500">Please select an X-axis</p>
+                        )}
+                      </div>
+
                       {/* Y-Axis */}
                       {chartConfig.chartType !== 'pie' && chartConfig.chartType !== 'doughnut' && (
                         <div className="mb-4">
-                          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Y-Axis (Values)
+                          <label className={`block text-sm font-medium mb-2 ${
+                            darkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
+                            Y-Axis <span className="text-red-500">*</span>
                           </label>
                           <select
-                            value={chartConfig.yAxis}
+                            value={chartConfig.yAxis || ''}
                             onChange={(e) => handleConfigChange('yAxis', e.target.value)}
-                            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
-                              darkMode
-                                ? 'bg-gray-700 border-gray-600 text-gray-200'
-                                : 'bg-white border-gray-300 text-gray-900'
+                            className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
+                              !chartConfig.yAxis && validationErrors.includes("Y-axis selection is required")
+                                ? 'border-red-500 bg-red-50/10'
+                                : darkMode
+                                  ? 'bg-gray-700/80 border-gray-600 text-gray-200'
+                                  : 'bg-white/80 border-gray-200 text-gray-700'
                             }`}
                           >
                             <option value="">Select Y-Axis</option>
-                            {metadata.fields.filter(f => f.type === 'numeric').map((field) => (
-                              <option key={field.name} value={field.name}>
+                            {columns.filter(f => f.type === 'numeric').map((field) => (
+                              <option key={`y-${field.name}`} value={field.name}>
                                 {field.name} ({field.type}) 🔢
                               </option>
                             ))}
                           </select>
+                          {!chartConfig.yAxis && validationErrors.includes("Y-axis selection is required") && (
+                            <p className="mt-1 text-sm text-red-500">Please select a Y-axis</p>
+                          )}
                         </div>
                       )}
 
                       {/* Z-Axis for 3D charts */}
-                      {chartConfig.chartType === '3d' && (
+                      {chartConfig.chartType.startsWith('3d') && (
                         <div className="mb-4">
                           <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Z-Axis (Depth)
+                            Z-Axis <span className="text-red-500">*</span>
                           </label>
                           <select
-                            value={chartConfig.zAxis}
+                            value={chartConfig.zAxis || ''}
                             onChange={(e) => handleConfigChange('zAxis', e.target.value)}
-                            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
-                              darkMode
-                                ? 'bg-gray-700 border-gray-600 text-gray-200'
-                                : 'bg-white border-gray-300 text-gray-900'
+                            className={`w-full p-2.5 border rounded-lg ${
+                              !chartConfig.zAxis && validationErrors.includes("Z-axis selection is required for 3D charts")
+                                ? 'border-red-500 bg-red-50/10'
+                                : darkMode
+                                  ? 'bg-gray-700/80 border-gray-600 text-gray-200'
+                                  : 'bg-white/80 border-gray-200 text-gray-700'
                             }`}
                           >
                             <option value="">Select Z-Axis</option>
-                            {metadata.fields.filter(f => f.type === 'numeric').map((field) => (
-                              <option key={field.name} value={field.name}>
-                                {field.name} ({field.type}) 🔢
+                            {columns.filter(col => col.type === 'numeric').map(col => (
+                              <option key={`z-${col.name}`} value={col.name}>
+                                {col.name} ({col.type}) 🔢
                               </option>
                             ))}
                           </select>
+                          {!chartConfig.zAxis && validationErrors.includes("Z-axis selection is required for 3D charts") && (
+                            <p className="mt-1 text-sm text-red-500">Please select a Z-axis</p>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Chart Settings */}
-                  <div>
-                    <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                      Chart Settings
+                  {/* Chart Controls Section */}
+                  <div className="mb-6">
+                    <h3 className={`text-lg font-semibold mb-4 flex items-center ${
+                      darkMode ? 'text-gray-200' : 'text-gray-800'
+                    }`}>
+                      {chartConfig.chartType.startsWith('3d') ? (
+                        <>
+                          3D Visualization Controls
+                          <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30">
+                            New
+                          </span>
+                        </>
+                      ) : 'Chart Controls'}
                     </h3>
-                    
-                    <div className="space-y-3">
-                      {Object.entries(chartConfig.settings).map(([key, value]) => (
-                        <label key={key} className="flex items-center space-x-3">
+
+                    {chartConfig.chartType.startsWith('3d') ? (
+                      <>
+                        {/* 3D Rotation Controls */}
+                        <div className="mb-4">
+                          <label className={`block text-sm font-medium mb-2 ${
+                            darkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
+                            3D Rotation
+                          </label>
+                          <div className="grid grid-cols-3 gap-4">
+                            {['x', 'y', 'z'].map(axis => (
+                              <div key={axis} className="space-y-1">
+                                <label className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  {axis.toUpperCase()}-axis rotation
+                                </label>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="360"
+                                  value={chartConfig[`rotation${axis.toUpperCase()}`] || 0}
+                                  onChange={(e) => handleConfigChange(`rotation${axis.toUpperCase()}`, parseInt(e.target.value))}
+                                  className="w-full"
+                                />
+                                <div className="text-xs text-center text-gray-500">
+                                  {chartConfig[`rotation${axis.toUpperCase()}`] || 0}°
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 3D Depth Control */}
+                        <div className="mb-4">
+                          <label className={`block text-sm font-medium mb-2 ${
+                            darkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
+                            Depth Intensity
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={chartConfig.depthIntensity || 50}
+                            onChange={(e) => handleConfigChange('depthIntensity', parseInt(e.target.value))}
+                            className="w-full"
+                          />
+                          <div className="text-xs text-center text-gray-500 mt-1">
+                            {chartConfig.depthIntensity || 50}%
+                          </div>
+                        </div>
+
+                        {/* 3D View Settings */}
+                        <div className="space-y-3">
+                          <label className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              checked={chartConfig.autoRotate || false}
+                              onChange={(e) => handleConfigChange('autoRotate', e.target.checked)}
+                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Auto Rotate
+                            </span>
+                          </label>
+
+                          <label className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              checked={chartConfig.showAxes || true}
+                              onChange={(e) => handleConfigChange('showAxes', e.target.checked)}
+                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Show 3D Axes
+                            </span>
+                          </label>
+
+                          <label className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              checked={chartConfig.showGrid || true}
+                              onChange={(e) => handleConfigChange('showGrid', e.target.checked)}
+                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Show 3D Grid
+                            </span>
+                          </label>
+                        </div>
+                      </>
+                    ) : (
+                      // Original chart controls for 2D charts
+                      <div className="space-y-3">
+                        <label className="flex items-center space-x-3">
                           <input
                             type="checkbox"
-                            checked={value}
-                            onChange={(e) => handleSettingsChange(key, e.target.checked)}
+                            checked={chartControls.showLegend}
+                            onChange={(e) => handleChartControlChange('showLegend', e.target.checked)}
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
                           <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                            Show Legend
                           </span>
                         </label>
-                      ))}
-                    </div>
+
+                        <label className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={chartControls.showGrid}
+                            onChange={(e) => handleChartControlChange('showGrid', e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Show Grid
+                          </span>
+                        </label>
+
+                        <label className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={chartControls.enableAnimation}
+                            onChange={(e) => handleChartControlChange('enableAnimation', e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Enable Animation
+                          </span>
+                        </label>
+
+                        <label className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={chartControls.stackedData}
+                            onChange={(e) => handleChartControlChange('stackedData', e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Stack Data (Bar/Area)
+                          </span>
+                        </label>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Validation Errors */}
-                  {validationErrors.length > 0 && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                      <div className="flex items-center mb-2">
-                        <FiAlertCircle className="text-red-500 mr-2" />
-                        <h4 className="text-sm font-medium text-red-800 dark:text-red-200">
-                          Configuration Issues
-                        </h4>
-                      </div>
-                      <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
-                        {validationErrors.map((error, index) => (
-                          <li key={index}>• {error}</li>
-                        ))}
-                      </ul>
+                  {/* Add Row Control Section */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className={`text-lg font-semibold ${
+                        darkMode ? 'text-gray-200' : 'text-gray-800'
+                      }`}>
+                        Data Preview Settings
+                      </h3>
+                      <select
+                        value={previewRowCount}
+                        onChange={(e) => handlePreviewRowCountChange(e.target.value)}
+                        className={`text-sm px-2 py-1 border rounded ${
+                          darkMode 
+                            ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                            : 'bg-white border-gray-300 text-gray-700'
+                        }`}
+                      >
+                        <option value={5}>5 rows</option>
+                        <option value={10}>10 rows</option>
+                        <option value={25}>25 rows</option>
+                        <option value={50}>50 rows</option>
+                        <option value={100}>100 rows</option>
+                      </select>
                     </div>
-                  )}
+
+                    {/* Data Preview Table */}
+                    {displayData.length > 0 && (
+                      <div className={`overflow-auto rounded-xl shadow-sm border ${
+                        darkMode ? 'border-gray-600' : 'border-gray-200/50'
+                      }`}>
+                        <table className="min-w-full divide-y divide-gray-200/50">
+                          <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50/80'}>
+                            <tr>
+                              {columns.map((col) => (
+                                <th
+                                  key={`header-${col}`}
+                                  className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                                    darkMode ? 'text-gray-300' : 'text-gray-500'
+                                  }`}
+                                >
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className={`divide-y ${
+                            darkMode ? 'divide-gray-600 bg-gray-700/50' : 'divide-gray-200/50 bg-white/80'
+                          }`}>
+                            {displayData.map((row, rowIndex) => (
+                              <tr 
+                                key={`row-${rowIndex}`} 
+                                className={darkMode ? 'hover:bg-gray-600/50' : 'hover:bg-gray-50/50'}
+                              >
+                                {columns.map((col) => (
+                                  <td
+                                    key={`cell-${rowIndex}-${col}`}
+                                    className={`px-4 py-3 whitespace-nowrap text-sm ${
+                                      darkMode ? 'text-gray-200' : 'text-gray-700'
+                                    }`}
+                                  >
+                                    {row[col]?.toString() || (
+                                      <span className={darkMode ? 'text-gray-400' : 'text-gray-400'}>
+                                        null
+                                      </span>
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {processedData.length > previewRowCount && (
+                      <div className={`mt-2 text-center text-sm ${
+                        darkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
+                        {processedData.length - previewRowCount} more rows available
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -513,47 +977,18 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
                 <h3 className={`text-lg font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
                   {chartConfig.title || 'Chart Preview'}
                 </h3>
-                {isLoadingData && (
-                  <FiLoader className="animate-spin text-indigo-600" />
-                )}
               </div>
               
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={handleRefreshData}
-                  disabled={isLoadingData}
+                  onClick={handleExportChart}
                   className={`p-2 rounded-lg transition-colors ${
                     darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
                   }`}
-                  title="Refresh Data"
+                  title="Export Chart"
                 >
-                  <FiRefreshCw className={isLoadingData ? 'animate-spin' : ''} />
+                  <FiDownload />
                 </button>
-                
-                <div className="relative group">
-                  <button
-                    className={`p-2 rounded-lg transition-colors ${
-                      darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
-                    }`}
-                    title="Export Chart"
-                  >
-                    <FiDownload />
-                  </button>
-                  <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                    <button
-                      onClick={() => handleExportChart('png')}
-                      className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg"
-                    >
-                      Export as PNG
-                    </button>
-                    <button
-                      onClick={() => handleExportChart('json')}
-                      className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg"
-                    >
-                      Export Config
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -570,11 +1005,18 @@ const ChartBuilder = ({ excelId, dashboardId, onClose, darkMode }) => {
               ) : chartData ? (
                 <div className="h-full">
                   <DynamicChart
-                    data={chartData.datasets[0]?.data || []}
+                    data={displayData}
                     chartType={chartConfig.chartType}
                     xAxis={chartConfig.xAxis}
                     yAxis={chartConfig.yAxis}
+                    zAxis={chartConfig.zAxis}
                     darkMode={darkMode}
+                    chartControls={chartControls}
+                    title={chartConfig.title}
+                    config={{
+                      theme: chartConfig.theme,
+                      ...chartConfig.settings
+                    }}
                   />
                 </div>
               ) : (

@@ -31,7 +31,7 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
           }
   
           const data = await response.json();
-          console.log("Fetched users:", data);
+  
           setUsers(data.data); // Assuming the API returns the array directly
         } catch (err) {
           setError(err.message);

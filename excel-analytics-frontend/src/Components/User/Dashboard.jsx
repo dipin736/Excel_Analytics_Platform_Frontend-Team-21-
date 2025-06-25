@@ -215,7 +215,7 @@ const Dashboard = () => {
 
       const result = await response.json();
 
-      // console.log("API Response:", result); // Remove console log for production
+      
 
       if (result.success && result.data) {
         if (Array.isArray(result.data)) {
@@ -227,9 +227,7 @@ const Dashboard = () => {
           setDashboards(result.data.recentActivity.dashboards);
         } else {
           setDashboards([]);
-          console.log(
-            "Dashboard data structure not recognized, dashboards set to empty."
-          );
+
         }
       } else {
         setDashboards([]);

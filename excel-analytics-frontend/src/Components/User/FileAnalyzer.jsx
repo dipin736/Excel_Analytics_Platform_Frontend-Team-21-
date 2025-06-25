@@ -1,80 +1,151 @@
 import React, { useState, useEffect } from "react";
 import { BaseUrluser } from "../../endpoint/baseurl";
 import DynamicChart from "./DynamicChart";
-import ChartBuilder from "./ChartBuilder";
 import { toast } from "react-toastify";
 import { motion } from 'framer-motion';
 import {
-  FiHome,
-  FiPieChart,
-  FiFileText,
-  FiUpload,
-  FiLogOut,
-  FiUser,
   FiX,
-  FiBarChart2,FiDownload,
+  FiBarChart2,
   FiLoader,
-  FiPlus
+  FiChevronLeft,
+  FiChevronRight,
+  FiAlertCircle,
+  FiPieChart,
+  FiTrendingUp,
+  FiActivity,
+  FiTarget,
+  FiLayers,
+  FiRefreshCw,
+  FiEye
 } from "react-icons/fi";
+
 const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
   const [selectedSheetIndex, setSelectedSheetIndex] = useState(0);
   const [xAxis, setXAxis] = useState("");
   const [yAxis, setYAxis] = useState("");
   const [chartType, setChartType] = useState("bar");
   const [processedData, setProcessedData] = useState([]);
-  const [fullProcessedData, setFullProcessedData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingFullData, setIsLoadingFullData] = useState(false);
   const [error, setError] = useState(null);
   const [apiAnalysisData, setApiAnalysisData] = useState(null);
-  const [showChartBuilder, setShowChartBuilder] = useState(false);
-  const [previewRowCount, setPreviewRowCount] = useState(5);
-  const [maxAvailableRows, setMaxAvailableRows] = useState(15);
-  const [displayData, setDisplayData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
+  const [selectedCategory, setSelectedCategory] = useState('basic');
+
+  // New states for enhanced data handling
+  const [fullDataset, setFullDataset] = useState([]);
+  const [chartRowLimit, setChartRowLimit] = useState(50);
+  const [isLoadingFullData, setIsLoadingFullData] = useState(false);
+  const [tableData, setTableData] = useState([]);
 
   const selectedFile = files?.find((file) => file._id === fileId) || {};
   const sheets = selectedFile?.sheets || [];
   const currentSheet = sheets[selectedSheetIndex] || {};
 
-  useEffect(() => {
-    const processData = () => {
-      try {
-        if (!currentSheet?.previewData || !xAxis || !yAxis) {
-          setProcessedData([]);
-          return;
-        }
+  // Chart categories for visual display
+  const chartCategories = {
+    basic: {
+      title: "Basic Charts",
+      icon: FiBarChart2,
+      color: "blue",
+      charts: [
+        { type: "bar", name: "Bar Chart", icon: "📊", description: "Compare categories" },
+        { type: "column", name: "Column Chart", icon: "📈", description: "Vertical bar comparison" },
+        { type: "line", name: "Line Chart", icon: "📉", description: "Show trends over time" },
+        { type: "area", name: "Area Chart", icon: "🏔️", description: "Filled line chart" },
+        { type: "scatter", name: "Scatter Plot", icon: "🔸", description: "Show correlations" }
+      ]
+    },
+    pie: {
+      title: "Pie Charts",
+      icon: FiPieChart,
+      color: "purple",
+      charts: [
+        { type: "pie", name: "2D Pie Chart", icon: "🥧", description: "Show proportions" },
+        { type: "3d-pie", name: "3D Pie Chart", icon: "🎂", description: "Enhanced pie with depth" },
+        { type: "doughnut", name: "Doughnut Chart", icon: "🍩", description: "Pie with center hole" }
+      ]
+    },
+    "3d": {
+      title: "3D Charts",
+      icon: FiLayers,
+      color: "green",
+      charts: [
+        { type: "3d-bar", name: "3D Bar Chart", icon: "🧱", description: "3D bar visualization" },
+        { type: "3d-column", name: "3D Column Chart", icon: "🏗️", description: "3D vertical bars" },
+        { type: "3d-scatter", name: "3D Scatter Plot", icon: "💎", description: "Three-dimensional data" }
+      ]
+    },
+    professional: {
+      title: "Professional Charts",
+      icon: FiTarget,
+      color: "indigo",
+      charts: [
+        { type: "waterfall", name: "Waterfall Chart", icon: "💧", description: "Show cumulative changes" },
+        { type: "funnel", name: "Funnel Chart", icon: "🎪", description: "Conversion analysis" },
+        { type: "gauge", name: "Gauge Chart", icon: "⏱️", description: "KPI dashboard dials" },
+        { type: "radar", name: "Radar Chart", icon: "🎯", description: "Multi-dimensional comparison" },
+        { type: "bubble", name: "Bubble Chart", icon: "🫧", description: "Three-variable analysis" }
+      ]
+    }
+  };
 
-        const headers = currentSheet.columns || [];
-        const dataRows = currentSheet.previewData.slice(1, parseInt(previewRowCount) + 1);
+  // Load full dataset when needed
+  const loadFullDataset = async () => {
+    if (isLoadingFullData) return;
+    
+    try {
+      setIsLoadingFullData(true);
+      const sheetName = currentSheet.name;
+      const response = await fetch(`${BaseUrluser}/excel/${fileId}/download-data?sheet=${encodeURIComponent(sheetName)}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-        const formattedData = dataRows
-          .map((row) => {
-            const item = {};
-            headers.forEach((header, index) => {
-              item[header] = row[index];
-            });
-            return item;
-          })
-          .filter(
-            (item) => item[xAxis] !== undefined && item[yAxis] !== undefined
-          );
+      if (!response.ok) throw new Error("Failed to load full dataset");
 
-        setProcessedData(formattedData);
-        setMaxAvailableRows(currentSheet.previewData.length - 1); // Subtract header row
-      } catch (err) {
-        setError("Error processing data: " + err.message);
-        console.error("Processing error:", err);
+      const data = await response.json();
+      if (data.success && data.data) {
+        setFullDataset(data.data);
+        toast.success(`Loaded ${data.data.length} rows successfully!`);
       }
-    };
+    } catch (err) {
+      console.error("Error loading full dataset:", err);
+      toast.error("Failed to load full dataset");
+    } finally {
+      setIsLoadingFullData(false);
+    }
+  };
 
-    processData();
-  }, [currentSheet, xAxis, yAxis, previewRowCount]);
+  // Load table data with pagination
+  const loadTableData = async (page = 1, limit = itemsPerPage) => {
+    try {
+      const sheetName = currentSheet.name;
+      const response = await fetch(`${BaseUrluser}/excel/${fileId}/table-data?sheet=${encodeURIComponent(sheetName)}&page=${page}&limit=${limit}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-  // Get column options - MODIFIED VERSION
+      if (!response.ok) throw new Error("Failed to load table data");
+
+      const data = await response.json();
+      if (data.success) {
+        setTableData(data.data || []);
+        return data;
+      }
+    } catch (err) {
+      console.error("Error loading table data:", err);
+      toast.error("Failed to load table data");
+      return null;
+    }
+  };
+
+  // Get column options
   const getColumns = () => {
     if (!currentSheet.columns) return [];
-
-    const baseColumns = currentSheet.columns
+    return currentSheet.columns
       .map((col, index) => ({
         name: col,
         index,
@@ -82,77 +153,69 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
         isNumeric: apiAnalysisData?.analytics?.summary[col]?.type === "numeric",
       }))
       .filter((col) => col.name);
-
-    return baseColumns;
   };
 
   const columns = getColumns();
-  const dataRows = currentSheet.previewData?.slice(1) || [];
 
-  // Function to fetch full data from backend
-  const fetchFullData = async () => {
-    try {
-      setIsLoadingFullData(true);
-      setError(null);
-
-      // Only fetch full data if explicitly analyzing, otherwise use preview count
-      const useFullData = apiAnalysisData !== null;
-      const endpoint = useFullData 
-        ? `${BaseUrluser}/excel/${fileId}/analyze?fullData=true&sheetIndex=${selectedSheetIndex}`
-        : `${BaseUrluser}/excel/${fileId}/preview?limit=${previewRowCount}&sheet=${encodeURIComponent(currentSheet.name)}`;
-
-      const response = await fetch(endpoint, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (!response.ok) throw new Error("Failed to fetch data");
-
-      const data = await response.json();
-      
-      if (data.success) {
-        const fullData = useFullData ? (data.data.fullData || data.data.rows || data.data) : data.previewData;
-        const headers = data.analytics?.columns || currentSheet.columns || [];
-
-        if (Array.isArray(fullData) && fullData.length > 0) {
-          const formattedFullData = fullData
-            .slice(1, useFullData ? undefined : previewRowCount + 1) // Limit rows if not analyzing
-            .map((row) => {
-              const item = {};
-              if (Array.isArray(row)) {
-                headers.forEach((header, index) => {
-                  item[header] = row[index];
-                });
-              } else if (typeof row === 'object') {
-                return row;
-              }
-              return item;
-            })
-            .filter(
-              (item) => item[xAxis] !== undefined && item[yAxis] !== undefined
-            );
-
-          setFullProcessedData(formattedFullData);
-          return formattedFullData;
-        }
-      }
-      throw new Error("Invalid data format received");
-    } catch (err) {
-      setError("Error fetching data: " + err.message);
-      console.error("Data fetch error:", err);
-      return [];
-    } finally {
-      setIsLoadingFullData(false);
+  // Process data for chart (with enhanced logic)
+  useEffect(() => {
+    if (!currentSheet?.previewData || !xAxis || !yAxis) {
+      setProcessedData([]);
+      return;
     }
-  };
 
+    // Use full dataset if available, otherwise use preview data
+    const dataSource = fullDataset.length > 0 ? fullDataset : currentSheet.previewData.slice(1);
+    const headers = fullDataset.length > 0 ? Object.keys(fullDataset[0] || {}) : (currentSheet.columns || []);
+    
+    let formattedData;
+    
+    if (fullDataset.length > 0) {
+      // Full dataset is already in object format
+      formattedData = dataSource.filter(
+        (item) => 
+          item[xAxis] !== undefined && 
+          item[xAxis] !== null && 
+          item[yAxis] !== undefined && 
+          item[yAxis] !== null
+      );
+    } else {
+      // Preview data is in array format
+      formattedData = dataSource
+      .map((row) => {
+        const item = {};
+        headers.forEach((header, index) => {
+          item[header] = row[index];
+        });
+        return item;
+      })
+      .filter(
+        (item) => 
+          item[xAxis] !== undefined && 
+          item[xAxis] !== null && 
+          item[yAxis] !== undefined && 
+          item[yAxis] !== null
+      );
+    }
+
+    // Apply chart row limit
+    const limitedData = formattedData.slice(0, chartRowLimit);
+    setProcessedData(limitedData);
+  }, [currentSheet, xAxis, yAxis, fullDataset, chartRowLimit]);
+
+  // Load table data when sheet changes
+  useEffect(() => {
+    if (currentSheet.name) {
+      loadTableData(currentPage, itemsPerPage);
+    }
+  }, [selectedSheetIndex, currentPage, itemsPerPage]);
+
+  // Handle analyze button
   const handleAnalyze = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // First fetch the analysis metadata
       const response = await fetch(`${BaseUrluser}/excel/${fileId}/analyze`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -164,711 +227,642 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
       const data = await response.json();
       setApiAnalysisData(data);
 
-      // Auto-select columns if none selected
-      if (!xAxis && data.analytics?.columns?.length > 0) {
-        setXAxis(data.analytics.columns[0]);
-      }
-      if (!yAxis && data.analytics?.columns?.length > 1) {
-        const numericCol = data.analytics.columns.find(
-          (col) => data.analytics.summary[col]?.type === "numeric"
-        );
-        if (numericCol) setYAxis(numericCol);
+      if (data?.analytics?.columns?.length > 0) {
+        if (!xAxis) {
+          setXAxis(data.analytics.columns[0]);
+        }
+        if (!yAxis && data.analytics.columns.length > 1) {
+          const numericCol = data.analytics.columns.find(
+            (col) => data.analytics.summary[col]?.type === "numeric"
+          );
+          if (numericCol) setYAxis(numericCol);
+        }
       }
 
-      // Fetch full data for analysis if axes are selected
-      if (xAxis && yAxis) {
-        await fetchFullData();
-      }
+      toast.success("Analysis completed successfully!");
     } catch (err) {
-      setError(err.message || "Failed to analyze data");
+      setError("Error analyzing file: " + err.message);
+      console.error("Analysis error:", err);
+      toast.error("Failed to analyze file");
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    setApiAnalysisData(null);
-    setFullProcessedData([]);
-  }, [currentSheet]);
-
-  // Auto-fetch full data when both axes are selected
-  useEffect(() => {
-    if (xAxis && yAxis && apiAnalysisData && fullProcessedData.length === 0) {
-      fetchFullData();
-    }
-  }, [xAxis, yAxis, apiAnalysisData]);
-
-  const handleSaveDashboard = async () => {
+  // Handle chart selection
+  const handleChartSelect = (chartType) => {
+    setChartType(chartType);
     if (!xAxis || !yAxis) {
-      setError(`Please select both X and Y axes`);
+      toast.info("Please select X and Y axes first!");
       return;
     }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Use the current data for the chart
-      let dataToUse = processedData;
-      
-      if (dataToUse.length === 0) {
-        setError("No data available for the selected axes");
-        return;
-      }
-
-      const chartTitle = `${xAxis} vs ${yAxis} Chart`;
-      const chartDataForPayload = {
-        labels: dataToUse.map((item) => item[xAxis]),
-        datasets: [
-          {
-            label: yAxis,
-            data: dataToUse.map((item) => parseFloat(item[yAxis]) || 0),
-            backgroundColor: darkMode ? [
-              "rgba(99, 102, 241, 0.8)",
-              "rgba(168, 85, 247, 0.8)",
-              "rgba(236, 72, 153, 0.8)",
-              "rgba(14, 165, 233, 0.8)",
-              "rgba(20, 184, 166, 0.8)",
-            ] : [
-              "rgba(99, 102, 241, 0.6)",
-              "rgba(168, 85, 247, 0.6)",
-              "rgba(236, 72, 153, 0.6)",
-              "rgba(14, 165, 233, 0.6)",
-              "rgba(20, 184, 166, 0.6)",
-            ],
-            borderColor: "rgba(99, 102, 241, 1)",
-            borderWidth: 1,
-          },
-        ],
-      };
-
-      const dashboardPayload = {
-        title: `Dashboard from ${selectedFile?.originalName || "Excel File"}`,
-        description: `Analysis of ${xAxis} vs ${yAxis} from ${selectedFile?.originalName || "Excel File"}`,
-        charts: [
-          {
-            title: chartTitle,
-            chartType,
-            data: chartDataForPayload,
-            configuration: {
-              xAxisLabel: xAxis,
-              yAxisLabel: yAxis,
-              fileId: fileId,
-              sheetName: currentSheet.name,
-              darkMode: darkMode,
-            },
-          },
-        ],
-        isPublic: false,
-      };
-
-      const response = await fetch(`${BaseUrluser}/dashboard`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(dashboardPayload),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || result.message || "Failed to save dashboard");
-      }
-
-      if (result.success) {
-        toast.success("Dashboard saved successfully! You can view it in the Dashboards section.");
-        onClose();
-      } else {
-        throw new Error(result.error || "Failed to save dashboard");
-      }
-    } catch (err) {
-      setError(err.message || "Failed to save dashboard");
-      toast.error(err.message || "Failed to save dashboard");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  const [layoutMode, setLayoutMode] = useState("split"); 
-
-  const handleDownload = async (format) => {
-    if (format === "png") {
-      const canvas = document.querySelector("canvas");
-      if (canvas) {
-        const url = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `analysis-${Date.now()}.png`;
-        link.click();
-      } else {
-        setError("No chart available to download");
-      }
-    } else if (format === "csv") {
-      if (!xAxis || !yAxis) {
-        setError("Please select both X and Y axes before downloading");
-        return;
-      }
-
-      try {
-        setIsLoadingFullData(true);
-        
-        // Fetch full data if not already available
-        let dataToUse = fullProcessedData;
-        if (dataToUse.length === 0) {
-          dataToUse = await fetchFullData();
-        }
-
-        if (dataToUse.length === 0) {
-          setError("No data available for download");
-          return;
-        }
-
-        const headers = [xAxis, yAxis].join(",");
-        const csvContent = [
-          headers,
-          ...dataToUse.map((item) => [item[xAxis], item[yAxis]].join(",")),
-        ].join("\n");
-
-        const blob = new Blob([csvContent], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `analysis-${Date.now()}.csv`;
-        link.click();
-        
-        toast.success(`Downloaded ${dataToUse.length} rows of data`);
-      } catch (err) {
-        setError("Failed to download data: " + err.message);
-      } finally {
-        setIsLoadingFullData(false);
-      }
-    }
   };
 
-  // New dynamic preview data fetching function
-  const fetchPreviewData = async (fileId, limit, sheetName) => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${BaseUrluser}/excel/${fileId}/preview?limit=${limit}&sheet=${encodeURIComponent(sheetName)}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch preview data");
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.previewData) {
-        // Update the current sheet's preview data with fresh data
-        const updatedSheets = sheets.map((sheet, index) => {
-          if (index === selectedSheetIndex) {
-            return {
-              ...sheet,
-              previewData: data.previewData,
-              rowCount: data.totalRows || sheet.rowCount
-            };
-          }
-          return sheet;
-        });
-
-        // Update the selectedFile with new sheet data
-        const updatedFile = {
-          ...selectedFile,
-          sheets: updatedSheets
-        };
-
-        // Update files array
-        const updatedFiles = files.map(file => 
-          file._id === fileId ? updatedFile : file
-        );
-
-        // Update parent component's files state if callback provided
-        if (onFilesUpdate) {
-          onFilesUpdate(updatedFiles);
-        }
-
-        // This would need to be passed from parent component
-        // For now, we'll just update local state
-        setMaxAvailableRows(data.previewData.length - 1); // Subtract header row
-        
-        return data.previewData;
-      }
-    } catch (err) {
-      console.error("Error fetching preview data:", err);
-      toast.error("Failed to fetch preview data");
-    } finally {
-      setIsLoading(false);
-    }
+  // Get color classes for categories
+  const getCategoryColorClasses = (color, selected = false) => {
+    const colors = {
+      blue: selected 
+        ? (darkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white')
+        : (darkMode ? 'bg-blue-900/50 text-blue-300 hover:bg-blue-800/70' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'),
+      purple: selected 
+        ? (darkMode ? 'bg-purple-600 text-white' : 'bg-purple-500 text-white')
+        : (darkMode ? 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/70' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'),
+      green: selected 
+        ? (darkMode ? 'bg-green-600 text-white' : 'bg-green-500 text-white')
+        : (darkMode ? 'bg-green-900/50 text-green-300 hover:bg-green-800/70' : 'bg-green-50 text-green-700 hover:bg-green-100'),
+      indigo: selected 
+        ? (darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white')
+        : (darkMode ? 'bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800/70' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'),
+    };
+    return colors[color] || colors.blue;
   };
 
-  // Update display data whenever preview count or current sheet changes
-  useEffect(() => {
-    if (currentSheet?.previewData) {
-      const newDisplayData = currentSheet.previewData.slice(1, parseInt(previewRowCount) + 1);
-      setDisplayData(newDisplayData);
+  // Calculate pagination for table data
+  const totalDataRows = currentSheet?.rowCount || tableData.length;
+  const totalPages = Math.ceil(totalDataRows / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
 
-      // Also update the processed data for the chart
-      if (xAxis && yAxis) {
-        const headers = currentSheet.columns || [];
-        const formattedData = newDisplayData
-          .map((row) => {
-            const item = {};
-            headers.forEach((header, index) => {
-              item[header] = row[index];
-            });
-            return item;
-          })
-          .filter(
-            (item) => item[xAxis] !== undefined && item[yAxis] !== undefined
-          );
-
-        setProcessedData(formattedData);
-      }
-    }
-  }, [currentSheet, previewRowCount, xAxis, yAxis]);
-
-  // Enhanced preview row count handler
-  const handlePreviewRowCountChange = async (newCount) => {
-    const parsedCount = parseInt(newCount);
-    setPreviewRowCount(parsedCount);
-    
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${BaseUrluser}/excel/${fileId}/preview?limit=${parsedCount}&sheet=${encodeURIComponent(currentSheet.name)}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch preview data");
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.previewData) {
-        // Update sheets with new data
-        const updatedSheets = sheets.map((sheet, index) => {
-          if (index === selectedSheetIndex) {
-            return {
-              ...sheet,
-              previewData: data.previewData,
-              rowCount: data.totalRows || sheet.rowCount
-            };
-          }
-          return sheet;
-        });
-
-        // Update files
-        const updatedFile = {
-          ...selectedFile,
-          sheets: updatedSheets
-        };
-
-        const updatedFiles = files.map(file => 
-          file._id === fileId ? updatedFile : file
-        );
-
-        if (onFilesUpdate) {
-          onFilesUpdate(updatedFiles);
-        }
-
-        // Get the preview data slice
-        const newPreviewData = data.previewData.slice(1, parsedCount + 1);
-        
-        // Update display data for table
-        setDisplayData(newPreviewData);
-        
-        // Update processed data for chart
-        if (xAxis && yAxis) {
-          const headers = currentSheet.columns || [];
-          const formattedData = newPreviewData
-            .map((row) => {
-              const item = {};
-              headers.forEach((header, index) => {
-                item[header] = row[index];
-              });
-              return item;
-            })
-            .filter(
-              (item) => item[xAxis] !== undefined && item[yAxis] !== undefined
-            );
-          setProcessedData(formattedData);
-        }
-        
-        setMaxAvailableRows(data.previewData.length - 1);
-      }
-    } catch (err) {
-      console.error("Error updating preview data:", err);
-      toast.error("Failed to update preview data");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Update maxAvailableRows when dataRows changes
-  useEffect(() => {
-    setMaxAvailableRows(dataRows.length);
-  }, [dataRows.length]);
-
-  // Auto-fetch fresh preview data when sheet changes or component mounts
-  useEffect(() => {
-    if (currentSheet.name && fileId && previewRowCount) {
-      fetchPreviewData(fileId, previewRowCount, currentSheet.name);
-    }
-  }, [selectedSheetIndex, fileId]);
-
-    return (
+  return (
+    <motion.div 
+      className={`fixed inset-0 flex items-center justify-center z-50 p-4 ${
+        darkMode ? 'bg-black/70' : 'bg-black/30'
+      } backdrop-blur-sm`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
       <motion.div 
-        className={`fixed inset-0 flex items-center justify-center z-50 p-4 ${darkMode ? 'bg-black/70' : 'bg-black/30'} backdrop-blur-sm`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        className={`w-full max-w-7xl max-h-[90vh] rounded-2xl shadow-2xl overflow-y-auto scrollbar-thin ${
+          darkMode ? 'bg-gray-800' : 'bg-white'
+        }`}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
       >
-        <motion.div 
-          className={`rounded-xl shadow-2xl p-6 w-full max-w-6xl max-h-[90vh] overflow-auto border ${darkMode ? 'bg-gray-800/90 border-gray-700' : 'bg-white/90 border-white/20'} backdrop-blur-lg`}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -20, opacity: 0 }}
-        >
-          {/* Header */}
-          <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200/50">
+        {/* Header */}
+        <div className={`p-6 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className="flex items-center justify-between">
             <div>
-              <h2 className={`text-2xl font-bold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                Analyzing: {selectedFile?.originalName || "File"}
+              <h2 className={`text-2xl font-bold ${
+                darkMode ? 'text-gray-100' : 'text-gray-800'
+              }`}>
+                {selectedFile?.originalName || "File Analysis"}
               </h2>
               <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                {sheets[selectedSheetIndex]?.name} • {sheets[selectedSheetIndex]?.rowCount} rows
+                {sheets[selectedSheetIndex]?.name} • {sheets[selectedSheetIndex]?.rowCount || 0} rows
               </p>
             </div>
-       
+            
+            <button
+              onClick={onClose}
+              className={`p-2 rounded-lg transition-colors ${
+                darkMode 
+                  ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-300' 
+                  : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <FiX className="h-5 w-5" />
+            </button>
           </div>
-    
-          {/* Status Indicators */}
-          <div className="mb-6 space-y-3">
-            {error && (
-              <motion.div 
-                className={`p-3 rounded-lg flex items-center ${darkMode ? 'bg-red-900/30 border-red-800' : 'bg-red-50/80 border-red-100'} border`}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <div className={`p-1.5 rounded-full mr-3 ${darkMode ? 'bg-red-800/50' : 'bg-red-100'}`}>
-                  <FiX className={darkMode ? 'text-red-400' : 'text-red-600'} />
-                </div>
-                <p className={darkMode ? 'text-red-300' : 'text-red-700'}>{error}</p>
-              </motion.div>
-            )}
-    
-            {isLoading && (
-              <motion.div 
-                className={`p-3 rounded-lg flex items-center ${darkMode ? 'bg-blue-900/30 border-blue-800' : 'bg-blue-50/80 border-blue-100'} border`}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <motion.div 
-                  className={`p-1.5 rounded-full mr-3 ${darkMode ? 'bg-blue-800/50' : 'bg-blue-100'}`}
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                >
-                  <FiLoader className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
-                </motion.div>
-                <p className={darkMode ? 'text-blue-300' : 'text-blue-700'}>Processing your data...</p>
-              </motion.div>
-            )}
-          </div>
-    
-          {/* Layout Controls */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {[
-              { mode: "split", label: "Split View", icon: <FiPieChart className="mr-1.5" /> },
-              { mode: "summary", label: "Summary", icon: <FiFileText className="mr-1.5" /> },
-              { mode: "chart", label: "Chart", icon: <FiBarChart2 className="mr-1.5" /> },
-              { mode: "table", label: "Table", icon: <FiFileText className="mr-1.5" /> }
-            ].map(({ mode, label, icon }) => (
-              <motion.button
-                key={mode}
-                onClick={() => setLayoutMode(mode)}
-                className={`px-3 py-1.5 rounded-lg flex items-center text-sm font-medium transition-colors ${
-                  layoutMode === mode 
-                    ? darkMode 
-                      ? "bg-indigo-700 text-white shadow-md" 
-                      : "bg-indigo-600 text-white shadow-md"
-                    : darkMode 
-                      ? "bg-gray-700/80 border border-gray-600 text-gray-200 hover:bg-gray-600" 
-                      : "bg-white/80 border border-gray-200 text-gray-700 hover:bg-gray-50"
-                }`}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                {icon}
-                {label}
-              </motion.button>
-            ))}
-          </div>
-    
-          {/* Sheet Selection */}
-          {sheets.length > 1 && (
-            <div className="mb-6">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Select Sheet
-              </label>
-              <select
-                value={selectedSheetIndex}
-                onChange={(e) => {
-                  setSelectedSheetIndex(parseInt(e.target.value));
-                  setXAxis("");
-                  setYAxis("");
-                }}
-                className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
-                  darkMode 
-                    ? 'bg-gray-700/80 border-gray-600 text-gray-200' 
-                    : 'bg-white/80 border-gray-200 text-gray-700'
-                }`}
-                disabled={isLoading}
-              >
-                {sheets.map((sheet, index) => (
-                  <option key={`sheet-${index}`} value={index}>
-                    {sheet.name} ({sheet.rowCount} rows)
-                  </option>
-                ))}
-              </select>
+        </div>
+
+        {/* Controls Section */}
+        <div className={`p-6 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          {/* Error Display */}
+          {error && (
+            <div className={`p-3 rounded-lg mb-4 flex items-center ${
+              darkMode ? 'bg-red-900/30 border-red-800' : 'bg-red-50 border-red-100'
+            } border`}>
+              <FiAlertCircle className={`mr-2 ${darkMode ? 'text-red-400' : 'text-red-600'}`} />
+              <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-700'}`}>{error}</p>
             </div>
           )}
-    
-          {/* Column Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Sheet Selection */}
+            {sheets.length > 1 && (
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Select Sheet
+                </label>
+                <select
+                  value={selectedSheetIndex}
+                  onChange={(e) => {
+                    setSelectedSheetIndex(parseInt(e.target.value));
+                    setXAxis("");
+                    setYAxis("");
+                    setFullDataset([]); // Clear full dataset when changing sheets
+                  }}
+                  className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                      : 'bg-white border-gray-200 text-gray-700'
+                  }`}
+                >
+                  {sheets.map((sheet, index) => (
+                    <option key={index} value={index}>
+                      {sheet.name} ({sheet.rowCount} rows)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* X-Axis Selection */}
             <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              <label className={`block text-sm font-medium mb-2 ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
                 X-Axis (Categories)
               </label>
               <select
                 value={xAxis}
-                onChange={(e) => {
-                  setXAxis(e.target.value);
-                  setPreviewRowCount(5);
-                  handlePreviewRowCountChange(5);
-                }}
-                className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
+                onChange={(e) => setXAxis(e.target.value)}
+                className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 ${
                   darkMode 
-                    ? 'bg-gray-700/80 border-gray-600 text-gray-200' 
-                    : 'bg-white/80 border-gray-200 text-gray-700'
+                    ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                    : 'bg-white border-gray-200 text-gray-700'
                 }`}
-                disabled={isLoading || columns.length === 0}
               >
-                <option value="">Select column</option>
+                <option value="">Select X-Axis</option>
                 {columns.map((col) => (
-                  <option key={`x-${col.key}`} value={col.name}>
-                    {col.name} {col.type === "numeric" ? "🔢" : "🔤"}
+                  <option key={col.key} value={col.name}>
+                    {col.name}
                   </option>
                 ))}
               </select>
             </div>
+
+            {/* Y-Axis Selection */}
             <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              <label className={`block text-sm font-medium mb-2 ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
                 Y-Axis (Values)
               </label>
               <select
                 value={yAxis}
-                onChange={(e) => {
-                  setYAxis(e.target.value);
-                  setPreviewRowCount(5);
-                  handlePreviewRowCountChange(5);
-                }}
-                className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
+                onChange={(e) => setYAxis(e.target.value)}
+                className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 ${
                   darkMode 
-                    ? 'bg-gray-700/80 border-gray-600 text-gray-200' 
-                    : 'bg-white/80 border-gray-200 text-gray-700'
+                    ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                    : 'bg-white border-gray-200 text-gray-700'
                 }`}
-                disabled={isLoading || columns.length === 0}
               >
-                <option value="">Select column</option>
+                <option value="">Select Y-Axis</option>
                 {columns.map((col) => (
-                  <option key={`y-${col.key}`} value={col.name}>
-                    {col.name} {col.type === "numeric" ? "🔢" : "🔤"}
+                  <option key={col.key} value={col.name}>
+                    {col.name}
                   </option>
                 ))}
               </select>
             </div>
-          </div>
-    
-          {/* Chart Type Selection */}
-          {layoutMode === "chart" && (
-            <div className="mb-6">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Chart Type
+
+            {/* Analyze Button */}
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
+                Data Analysis
               </label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { type: "bar", label: "Bar", color: "bg-blue-500" },
-                  { type: "pie", label: "Pie", color: "bg-purple-500" },
-                  { type: "line", label: "Line", color: "bg-green-500" },
-                  { type: "scatter", label: "Scatter", color: "bg-orange-500" }
-                ].map(({ type, label, color }) => (
-                  <motion.button
-                    key={`chart-type-${type}`}
-                    onClick={() => setChartType(type)}
-                    disabled={isLoading}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium text-white ${color} ${
-                      chartType === type 
-                        ? darkMode 
-                          ? 'ring-2 ring-offset-2 ring-gray-500' 
-                          : 'ring-2 ring-offset-2 ring-gray-400' 
-                        : 'opacity-90 hover:opacity-100'
-                    }`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {label}
-                  </motion.button>
-                ))}
-              </div>
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isLoading}
+                className={`w-full px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                    isLoading
+                      ? 'opacity-50 cursor-not-allowed'
+                      : darkMode 
+                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+                        : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                  }`}
+                >
+                  {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <FiLoader className="animate-spin h-5 w-5 mr-2" />
+                    Analyzing...
+                  </div>
+                  ) : (
+                  <div className="flex items-center justify-center">
+                    <FiActivity className="h-5 w-5 mr-2" />
+                    Analyze Data
+                  </div>
+                  )}
+                </button>
             </div>
-          )}
-    
-          {/* Analysis Summary */}
-          {apiAnalysisData?.analytics && layoutMode === "summary" && (
-            <motion.div 
-              className={`mb-6 p-4 rounded-xl shadow-sm border ${
-                darkMode ? 'bg-gray-700/80 border-gray-600' : 'bg-white/80 border-gray-200/50'
-              }`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <h3 className={`font-medium text-lg mb-3 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                Analysis Summary
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="p-6 space-y-8">
+            {/* Chart Categories Section */}
+            <div className="mb-8">
+              <h3 className={`text-lg font-semibold mb-4 ${
+                darkMode ? 'text-gray-200' : 'text-gray-800'
+              }`}>
+                📊 Choose Your Chart Type
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Object.entries(apiAnalysisData.analytics.summary).map(
-                  ([col, stats]) => (
-                    <motion.div
-                      key={col}
-                      className={`p-3 rounded-lg border shadow-xs hover:shadow-sm transition-shadow ${
-                        darkMode ? 'bg-gray-600/80 border-gray-500' : 'bg-white border-gray-100'
+              
+              {/* Category Tabs */}
+              <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-thin">
+                {Object.entries(chartCategories).map(([categoryKey, category]) => {
+                  const IconComponent = category.icon;
+                  const isSelected = selectedCategory === categoryKey;
+                  
+                  return (
+                    <button
+                      key={categoryKey}
+                      onClick={() => setSelectedCategory(categoryKey)}
+                      className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
+                        getCategoryColorClasses(category.color, isSelected)
+                      }`}
+                    >
+                      <IconComponent className="h-4 w-4 mr-2" />
+                      {category.title}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Chart Cards with Scroll */}
+              <div className="max-h-64 overflow-y-auto scrollbar-thin">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 pr-2">
+                  {chartCategories[selectedCategory].charts.map((chart) => (
+                    <motion.button
+                      key={chart.type}
+                      onClick={() => handleChartSelect(chart.type)}
+                      className={`p-4 rounded-xl border transition-all duration-200 text-left hover:scale-105 ${
+                        chartType === chart.type
+                          ? (darkMode 
+                            ? 'border-indigo-500 bg-indigo-900/30 shadow-lg' 
+                            : 'border-indigo-500 bg-indigo-50 shadow-lg')
+                          : (darkMode 
+                            ? 'border-gray-600 bg-gray-700/50 hover:border-gray-500' 
+                            : 'border-gray-200 bg-gray-50 hover:border-gray-300')
                       }`}
                       whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.98 }}
                     >
-                      <div className={`font-medium truncate mb-1 ${
-                        darkMode ? 'text-indigo-400' : 'text-indigo-600'
+                      <div className="text-2xl mb-2">{chart.icon}</div>
+                      <h4 className={`font-medium mb-1 ${
+                        darkMode ? 'text-gray-200' : 'text-gray-800'
                       }`}>
-                        {col}
-                      </div>
-                      {stats.type === "numeric" && (
-                        <div className={`space-y-1 text-sm ${
+                        {chart.name}
+                      </h4>
+                      <p className={`text-xs ${
+                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                        {chart.description}
+                      </p>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Chart Visualization Section */}
+          <div className={`rounded-xl border p-6 ${
+            darkMode ? 'border-gray-600 bg-gray-700/50' : 'border-gray-200 bg-gray-50/50'
+          }`}>
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className={`text-xl font-semibold ${
+              darkMode ? 'text-gray-200' : 'text-gray-800'
+            }`}>
+                    📈 Chart Preview
+            </h3>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {chartType ? `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart` : 'Select a chart type above'}
+                  </p>
+                </div>
+
+                {/* Chart Controls */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Row Limit Control */}
+                  <div className="flex items-center gap-2">
+                    <label className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Chart Rows:
+                    </label>
+                    <select
+                      value={chartRowLimit}
+                      onChange={(e) => setChartRowLimit(Number(e.target.value))}
+                      className={`px-2 py-1 text-sm rounded border ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                          : 'bg-white border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      <option value={10}>10 rows</option>
+                      <option value={25}>25 rows</option>
+                      <option value={50}>50 rows</option>
+                      <option value={100}>100 rows</option>
+                      <option value={500}>500 rows</option>
+                      <option value={1000}>1000 rows</option>
+                    </select>
+                  </div>
+
+                  {/* Load More Data Button */}
+                  <button
+                    onClick={loadFullDataset}
+                    disabled={isLoadingFullData || fullDataset.length > 0}
+                    className={`flex items-center px-3 py-1 text-sm rounded border transition-colors ${
+                      fullDataset.length > 0
+                        ? (darkMode ? 'bg-green-900/30 border-green-700 text-green-400' : 'bg-green-50 border-green-200 text-green-700')
+                        : isLoadingFullData
+                          ? 'opacity-50 cursor-not-allowed'
+                          : (darkMode 
+                            ? 'bg-blue-900/30 border-blue-700 text-blue-400 hover:bg-blue-800/50' 
+                            : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100')
+                    }`}
+                  >
+                    {isLoadingFullData ? (
+                      <>
+                        <FiLoader className="animate-spin h-3 w-3 mr-1" />
+                        Loading...
+                      </>
+                    ) : fullDataset.length > 0 ? (
+                      <>
+                        <FiEye className="h-3 w-3 mr-1" />
+                        {fullDataset.length} rows loaded
+                      </>
+                    ) : (
+                      <>
+                        <FiRefreshCw className="h-3 w-3 mr-1" />
+                        Load Full Data
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+
+              {/* Row Preview Info */}
+              {processedData.length > 0 && (
+                <div className={`mb-4 p-3 rounded-lg text-sm ${
+                  darkMode ? 'bg-blue-900/30 border-blue-700 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-700'
+                } border`}>
+                  <div className="flex items-center justify-between">
+                    <span>
+                      📊 Showing {processedData.length} of {
+                        fullDataset.length > 0 
+                          ? fullDataset.filter(item => item[xAxis] && item[yAxis]).length 
+                          : 'unknown'
+                      } valid data points
+                    </span>
+                    {fullDataset.length === 0 && (
+                      <span className="text-xs opacity-75">
+                        (Limited to preview data - load full dataset for all rows)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div className="h-80">
+              {!xAxis || !yAxis ? (
+                <div className={`flex items-center justify-center h-full text-center ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  <div>
+                    <FiBarChart2 className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">Select X and Y axes to display chart</p>
+                    <p className="text-sm mt-2">Choose your data columns from the controls above</p>
+                  </div>
+                </div>
+              ) : isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <FiLoader className="animate-spin h-12 w-12 mx-auto mb-4 text-indigo-500" />
+                    <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Loading chart...
+                    </p>
+                  </div>
+                </div>
+              ) : !processedData || processedData.length === 0 ? (
+                <div className={`flex items-center justify-center h-full ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  <div className="text-center">
+                    <p className="text-lg">No valid data for selected axes</p>
+                      <p className="text-sm mt-2">Try selecting different columns or loading full dataset</p>
+                    </div>
+                </div>
+              ) : (
+                <DynamicChart
+                  data={processedData}
+                  chartType={chartType}
+                  xAxis={xAxis}
+                  yAxis={yAxis}
+                  darkMode={darkMode}
+                    title={`${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`}
+                    chartControls={{
+                      showLegend: true,
+                      showGrid: true,
+                      enableAnimation: true
+                    }}
+                    config={{
+                      theme: 'default',
+                      responsive: true
+                    }}
+                    fileId={fileId}
+                    sheetName={currentSheet.name}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Summary Section */}
+            <div className={`mt-8 rounded-xl border p-6 ${
+            darkMode ? 'border-gray-600 bg-gray-700/50' : 'border-gray-200 bg-gray-50/50'
+          }`}>
+            <h3 className={`text-xl font-semibold mb-6 ${
+              darkMode ? 'text-gray-200' : 'text-gray-800'
+            }`}>
+              📈 Data Summary & Statistics
+            </h3>
+            
+            <div className="min-h-[300px]">
+              {!apiAnalysisData ? (
+                <div className={`flex items-center justify-center h-full text-center ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  <div>
+                      <p className="text-lg">Click "Analyze Data" to generate summary statistics</p>
+                    <p className="text-sm mt-2">Get detailed insights about your data columns</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Object.entries(apiAnalysisData?.analytics?.summary || {}).map(([column, stats]) => (
+                    <div
+                      key={column}
+                      className={`p-4 rounded-lg border ${
+                        darkMode 
+                            ? 'border-gray-600 bg-gray-700/30' 
+                            : 'border-gray-200 bg-white/50'
+                      }`}
+                    >
+                      <h4 className={`font-semibold mb-3 ${
+                        darkMode ? 'text-gray-200' : 'text-gray-800'
+                      }`}>
+                        {column}
+                      </h4>
+                        <div className="space-y-2">
+                        <div className={`flex justify-between ${
                           darkMode ? 'text-gray-300' : 'text-gray-600'
                         }`}>
-                          <div className="flex justify-between">
-                            <span>Average:</span>
-                            <span className="font-medium">{stats.avg?.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Range:</span>
-                            <span className="font-medium">{stats.min} - {stats.max}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Std Dev:</span>
-                            <span className="font-medium">{stats.stdDev?.toFixed(2)}</span>
-                          </div>
+                          <span>Type:</span>
+                            <span className="font-medium capitalize">{stats.type}</span>
                         </div>
-                      )}
-                      {stats.type === "categorical" && (
-                        <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                          <div className="flex justify-between">
-                            <span>Unique Values:</span>
-                            <span className="font-medium">{stats.uniqueCount}</span>
-                          </div>
-                          {stats.topValue && (
-                            <div className="flex justify-between">
-                              <span>Most Common:</span>
-                              <span className="font-medium truncate">{stats.topValue}</span>
+                        <div className={`flex justify-between ${
+                          darkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          <span>Count:</span>
+                          <span className="font-medium">{stats.count}</span>
+                        </div>
+                        {stats.type === 'numeric' && (
+                          <>
+                            <div className={`flex justify-between ${
+                              darkMode ? 'text-gray-300' : 'text-gray-600'
+                            }`}>
+                              <span>Mean:</span>
+                              <span className="font-medium">{stats.mean?.toFixed(2)}</span>
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </motion.div>
-                  )
-                )}
-              </div>
-            </motion.div>
-          )}
-    
-          {/* Split View Layout */}
-          {layoutMode === "split" && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-              {/* Data Preview - Left Side */}
-              {dataRows.length > 0 && (
-                <motion.div 
-                  className="space-y-4"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className={`text-lg font-semibold ${
-                      darkMode ? 'text-gray-100' : 'text-gray-800'
-                    }`}>
-                      Data Preview
-                    </h3>
-                    <div className="flex items-center space-x-3">
-                      <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Showing {Math.min(previewRowCount, dataRows.length)} of {currentSheet.rowCount || dataRows.length} rows
-                      </span>
-                      <select
-                        value={previewRowCount}
-                        onChange={(e) => handlePreviewRowCountChange(e.target.value)}
-                        className={`text-sm px-2 py-1 border rounded ${
-                          darkMode 
-                            ? 'bg-gray-700 border-gray-600 text-gray-200' 
-                            : 'bg-white border-gray-300 text-gray-700'
-                        }`}
-                      >
-                        <option value={5}>5 rows</option>
-                        <option value={10}>10 rows</option>
-                        <option value={15}>15 rows</option>
-                        <option value={20}>20 rows</option>
-                      </select>
+                            <div className={`flex justify-between ${
+                              darkMode ? 'text-gray-300' : 'text-gray-600'
+                            }`}>
+                              <span>Range:</span>
+                              <span className="font-medium">{stats.min} - {stats.max}</span>
+                            </div>
+                          </>
+                        )}
+                        
+                        {stats.uniqueValues && (
+                          <div className={`flex justify-between ${
+                            darkMode ? 'text-gray-300' : 'text-gray-600'
+                          }`}>
+                            <span>Unique Values:</span>
+                            <span className="font-medium">{stats.uniqueValues}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Table Section */}
+            <div className={`mt-8 rounded-xl border p-6 ${
+            darkMode ? 'border-gray-600 bg-gray-700/50' : 'border-gray-200 bg-gray-50/50'
+          }`}>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+                <div>
+              <h3 className={`text-xl font-semibold ${
+                darkMode ? 'text-gray-200' : 'text-gray-800'
+              }`}>
+                📋 Data Table
+              </h3>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {tableData.length} total rows • Showing {tableData.length} of {tableData.length} rows per page
+                    {tableData.length > 10 && (
+                      <span className="ml-2 text-blue-500">📜 Scrollable table</span>
+                    )}
+                  </p>
+                </div>
+              
+              <div className="flex items-center space-x-3">
+                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Rows per page:
+                </span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                    className={`px-3 py-2 rounded border focus:ring-2 focus:ring-indigo-500 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                      : 'bg-white border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                    <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                    <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+            
+              <div className="space-y-4">
+              {!tableData.length ? (
+                  <div className={`flex items-center justify-center h-40 text-center ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  <div>
+                    <p className="text-lg">No data available</p>
+                    <p className="text-sm mt-2">Please select a sheet with data</p>
                   </div>
-                  <div className={`overflow-auto rounded-xl shadow-sm border h-96 ${
-                    darkMode ? 'border-gray-600' : 'border-gray-200/50'
-                  }`}>
-                    <table className="min-w-full divide-y divide-gray-200/50">
-                      <thead className={`sticky top-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-50/80'}`}>
+                </div>
+              ) : (
+                <>
+                    <div className={`max-h-64 overflow-auto rounded-lg border ${
+                    darkMode ? 'border-gray-600' : 'border-gray-200'
+                    } scrollbar-thin`}>
+                    <table className="min-w-full">
+                        <thead className={`sticky top-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                         <tr>
+                            <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                              darkMode ? 'text-gray-300' : 'text-gray-500'
+                            }`}>
+                              #
+                            </th>
                           {columns.map((col) => (
                             <th
-                              key={`header-${col.key}`}
-                              className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                              key={col.key}
+                                className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                                 darkMode ? 'text-gray-300' : 'text-gray-500'
                               }`}
                             >
                               {col.name}
+                                {col.isNumeric && (
+                                  <span className="ml-1 text-blue-500">📊</span>
+                                )}
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${
-                        darkMode ? 'divide-gray-600 bg-gray-700/50' : 'divide-gray-200/50 bg-white/80'
+                        darkMode ? 'divide-gray-600 bg-gray-800' : 'divide-gray-200 bg-white'
                       }`}>
-                        {displayData.map((row, rowIndex) => (
+                          {tableData.map((row, rowIndex) => (
                           <tr 
-                            key={`row-${rowIndex}`} 
-                            className={darkMode ? 'hover:bg-gray-600/50' : 'hover:bg-gray-50/50'}
+                            key={rowIndex}
+                              className={`transition-colors ${
+                                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                              }`}
                           >
+                              <td className={`px-4 py-3 text-sm font-medium ${
+                                darkMode ? 'text-gray-400' : 'text-gray-500'
+                              }`}>
+                                {rowIndex + 1}
+                              </td>
                             {columns.map((col) => (
                               <td
-                                key={`cell-${rowIndex}-${col.key}`}
-                                className={`px-4 py-3 whitespace-nowrap text-sm ${
-                                  darkMode ? 'text-gray-200' : 'text-gray-700'
+                                key={`${rowIndex}-${col.key}`}
+                                  className={`px-4 py-3 text-sm ${
+                                  darkMode ? 'text-gray-300' : 'text-gray-700'
                                 }`}
                               >
-                                {row[col.index]?.toString() || (
-                                  <span className={darkMode ? 'text-gray-400' : 'text-gray-400'}>
-                                    null
-                                  </span>
-                                )}
+                                  <div className="max-w-xs truncate" title={row[col.name]?.toString() || '—'}>
+                                {row[col.name]?.toString() || '—'}
+                                  </div>
                               </td>
                             ))}
                           </tr>
@@ -876,308 +870,68 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
                       </tbody>
                     </table>
                   </div>
-                  {dataRows.length > previewRowCount && (
-                    <div className={`text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {dataRows.length - previewRowCount} more rows available. Use "Analyze Data" to process all rows.
-                    </div>
-                  )}
-                </motion.div>
-              )}
 
-              {/* Chart Preview - Right Side */}
-              {xAxis && yAxis && processedData.length > 0 && (
-                <motion.div 
-                  className="space-y-4"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className={`text-lg font-semibold ${
-                      darkMode ? 'text-gray-100' : 'text-gray-800'
-                    }`}>
-                      Chart Preview
-                    </h3>
-                    <div className="flex items-center space-x-2">
-                      <span className={`text-sm px-2 py-1 rounded-full ${
-                        darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
-                      }`}>
-                        Showing {Math.min(previewRowCount, processedData.length)} rows
-                      </span>
-                    </div>
-                  </div>
-                  <div className={`h-96 w-full rounded-xl border shadow-sm p-4 ${
-                    darkMode ? 'bg-gray-700/80 border-gray-600' : 'bg-white/80 border-gray-200/50'
-                  }`}>
-                    <DynamicChart
-                      data={processedData.slice(0, previewRowCount)}
-                      chartType={chartType}
-                      xAxis={xAxis}
-                      yAxis={yAxis}
-                      darkMode={darkMode}
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </div>
-          )}
-
-          {/* Table Only View */}
-          {dataRows.length > 0 && layoutMode === "table" && (
-            <motion.div 
-              className="mb-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`text-lg font-semibold ${
-                  darkMode ? 'text-gray-100' : 'text-gray-800'
-                }`}>
-                  Data Preview
-                </h3>
-                <div className="flex items-center space-x-3">
-                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Showing {Math.min(previewRowCount, dataRows.length)} of {currentSheet.rowCount || dataRows.length} rows
-                  </span>
-                  <select
-                    value={previewRowCount}
-                    onChange={(e) => handlePreviewRowCountChange(e.target.value)}
-                    className={`text-sm px-2 py-1 border rounded ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-gray-200' 
-                        : 'bg-white border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    <option value={5}>5 rows</option>
-                    <option value={10}>10 rows</option>
-                    <option value={25}>25 rows</option>
-                    <option value={50}>50 rows</option>
-                  </select>
-                </div>
-              </div>
-              <div className={`overflow-auto rounded-xl shadow-sm border ${
-                darkMode ? 'border-gray-600' : 'border-gray-200/50'
-              }`}>
-                <table className="min-w-full divide-y divide-gray-200/50">
-                  <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50/80'}>
-                    <tr>
-                      {columns.map((col) => (
-                        <th
-                          key={`header-${col.key}`}
-                          className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                            darkMode ? 'text-gray-300' : 'text-gray-500'
+                    {/* Pagination - Always visible */}
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+                      <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-700'}`}>
+                        Showing {tableData.length} of {totalDataRows} total entries
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => {
+                            const newPage = Math.max(currentPage - 1, 1);
+                            setCurrentPage(newPage);
+                          }}
+                          disabled={currentPage === 1}
+                          className={`px-3 py-2 rounded border transition-colors ${
+                            currentPage === 1
+                              ? 'opacity-50 cursor-not-allowed'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-600'
+                          } ${
+                            darkMode 
+                              ? 'bg-gray-700 border-gray-600 text-gray-300' 
+                              : 'bg-white border-gray-300 text-gray-700'
                           }`}
                         >
-                          {col.name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${
-                    darkMode ? 'divide-gray-600 bg-gray-700/50' : 'divide-gray-200/50 bg-white/80'
-                  }`}>
-                    {displayData.map((row, rowIndex) => (
-                      <tr 
-                        key={`row-${rowIndex}`} 
-                        className={darkMode ? 'hover:bg-gray-600/50' : 'hover:bg-gray-50/50'}
-                      >
-                        {columns.map((col) => (
-                          <td
-                            key={`cell-${rowIndex}-${col.key}`}
-                            className={`px-4 py-3 whitespace-nowrap text-sm ${
-                              darkMode ? 'text-gray-200' : 'text-gray-700'
-                            }`}
-                          >
-                            {row[col.index]?.toString() || (
-                              <span className={darkMode ? 'text-gray-400' : 'text-gray-400'}>
-                                null
-                              </span>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {dataRows.length > previewRowCount && (
-                <div className={`mt-2 text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {dataRows.length - previewRowCount} more rows available. Use "Analyze Data" to process all rows.
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* Chart Only View */}
-          {xAxis && yAxis && (processedData.length > 0 || fullProcessedData.length > 0) && layoutMode === "chart" && (
-            <motion.div 
-              className="mb-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`text-lg font-semibold ${
-                  darkMode ? 'text-gray-100' : 'text-gray-800'
-                }`}>
-                  Chart Preview
-                </h3>
-                <div className="flex items-center space-x-2">
-                  {fullProcessedData.length > 0 && (
-                    <span className={`text-sm px-2 py-1 rounded-full ${
-                      darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
-                    }`}>
-                      Full Data: {fullProcessedData.length} rows
-                    </span>
-                  )}
-                  {processedData.length > 0 && fullProcessedData.length === 0 && (
-                    <span className={`text-sm px-2 py-1 rounded-full ${
-                      darkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      Preview: {processedData.length} rows
-                    </span>
-                  )}
-                  {isLoadingFullData && (
-                    <span className={`text-sm px-2 py-1 rounded-full flex items-center ${
-                      darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      <FiLoader className="animate-spin mr-1" size={12} />
-                      Loading full data...
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className={`h-96 w-full rounded-xl border shadow-sm p-4 ${
-                darkMode ? 'bg-gray-700/80 border-gray-600' : 'bg-white/80 border-gray-200/50'
-              }`}>
-                <DynamicChart
-                  data={fullProcessedData.length > 0 ? fullProcessedData : processedData}
-                  chartType={chartType}
-                  xAxis={xAxis}
-                  yAxis={yAxis}
-                  darkMode={darkMode}
-                />
-              </div>
-            </motion.div>
-          )}
-    
-          {/* Action Buttons */}
-          <div className={`flex flex-wrap justify-end gap-3 pt-4 border-t ${
-            darkMode ? 'border-gray-700' : 'border-gray-200/50'
-          }`}>
-            <div className="flex flex-wrap gap-2 mr-auto">
-                          <button
-              onClick={() => handleDownload("png")}
-              disabled={isLoadingFullData || !xAxis || !yAxis}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center transition-colors ${
-                isLoadingFullData || !xAxis || !yAxis
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : darkMode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-500 hover:bg-blue-600'
-              } text-white`}
-            >
-              <FiDownload className="mr-1.5" /> PNG
-            </button>
-            <button
-              onClick={() => handleDownload("csv")}
-              disabled={isLoadingFullData || !xAxis || !yAxis}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center transition-colors ${
-                isLoadingFullData || !xAxis || !yAxis
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : darkMode ? 'bg-green-600 hover:bg-green-500' : 'bg-green-500 hover:bg-green-600'
-              } text-white`}
-            >
-              {isLoadingFullData ? (
-                <>
-                  <FiLoader className="animate-spin mr-1.5" /> Loading...
-                </>
-              ) : (
-                <>
-                  <FiDownload className="mr-1.5" /> CSV
+                          <FiChevronLeft className="h-4 w-4" />
+                        </button>
+                        
+                        <span className={`px-4 py-2 min-w-[100px] text-center ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          Page {currentPage} of {totalPages || 1}
+                        </span>
+                        
+                        <button
+                          onClick={() => {
+                            const newPage = Math.min(currentPage + 1, totalPages);
+                            setCurrentPage(newPage);
+                          }}
+                          disabled={currentPage === totalPages || totalPages <= 1}
+                          className={`px-3 py-2 rounded border transition-colors ${
+                            currentPage === totalPages || totalPages <= 1
+                              ? 'opacity-50 cursor-not-allowed'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-600'
+                          } ${
+                            darkMode 
+                              ? 'bg-gray-700 border-gray-600 text-gray-300' 
+                              : 'bg-white border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          <FiChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
                 </>
               )}
-            </button>
             </div>
-    
-            <button
-              onClick={onClose}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                darkMode 
-                  ? 'border border-gray-600 text-gray-200 hover:bg-gray-700' 
-                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-    
-            <button
-              onClick={handleAnalyze}
-              disabled={isLoading || !currentSheet}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                isLoading || !currentSheet
-                  ? darkMode 
-                    ? 'bg-indigo-800 text-gray-400 cursor-not-allowed' 
-                    : 'bg-indigo-300 text-white cursor-not-allowed'
-                  : darkMode 
-                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white' 
-                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              }`}
-            >
-              {isLoading ? (
-                <span className="flex items-center">
-                  <FiLoader className="animate-spin mr-2" /> Processing...
-                </span>
-              ) : (
-                "Analyze Data"
-              )}
-            </button>
-    
-            <button
-              onClick={handleSaveDashboard}
-              disabled={isLoading || isLoadingFullData || !xAxis || !yAxis}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                isLoading || isLoadingFullData || !xAxis || !yAxis
-                  ? darkMode 
-                    ? 'bg-green-800 text-gray-400 cursor-not-allowed' 
-                    : 'bg-green-300 text-white cursor-not-allowed'
-                  : darkMode 
-                    ? 'bg-green-600 hover:bg-green-500 text-white' 
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-            >
-              {isLoading || isLoadingFullData ? (
-                <span className="flex items-center">
-                  <FiLoader className="animate-spin mr-2" /> 
-                  {isLoadingFullData ? 'Loading Data...' : 'Saving...'}
-                </span>
-              ) : (
-                'Save to Dashboard'
-              )}
-            </button>
-
-            <button
-              onClick={() => setShowChartBuilder(true)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
-                darkMode 
-                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              }`}
-            >
-              <FiPlus />
-              <span>Advanced Chart Builder</span>
-            </button>
           </div>
 
-          {/* Chart Builder Modal */}
-          {showChartBuilder && (
-            <ChartBuilder
-              excelId={fileId}
-              dashboardId="temp-dashboard" // This should be passed from parent or fetched
-              onClose={() => setShowChartBuilder(false)}
-              darkMode={darkMode}
-            />
-          )}
-        </motion.div>
+
+        </div>
+
       </motion.div>
-    );
-  };
-  
-  export default FileAnalyzer;
+    </motion.div>
+  );
+};
+
+export default FileAnalyzer;

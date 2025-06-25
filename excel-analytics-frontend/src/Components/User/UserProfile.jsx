@@ -104,7 +104,7 @@ const UserProfile = ({darkMode,setDarkMode}) => {
         },
         body: formData
       });
-      console.log('Submitting userData:', userData);
+  
 
       const data = await response.json();
       if (data.success) {

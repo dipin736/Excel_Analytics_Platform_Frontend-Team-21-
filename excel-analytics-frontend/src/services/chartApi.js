@@ -6,10 +6,16 @@ import { BaseUrluser } from "../endpoint/baseurl";
  */
 
 // Get authentication headers
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${localStorage.getItem('token')}`,
-  'Content-Type': 'application/json'
-});
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+
+  }
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
+};
 
 /**
  * GET /api/excel/:id/chart-metadata
@@ -71,6 +77,37 @@ export const getChartData = async (excelId, params = {}) => {
     };
   } catch (error) {
     console.error('Error fetching chart data:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
+ * POST /api/dashboard/
+ * Create a new dashboard
+ */
+export const createDashboard = async (dashboardData) => {
+  try {
+    const response = await fetch(`${BaseUrluser}/dashboard/`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(dashboardData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create dashboard: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      data: data
+    };
+  } catch (error) {
+    console.error('Error creating dashboard:', error);
     return {
       success: false,
       error: error.message

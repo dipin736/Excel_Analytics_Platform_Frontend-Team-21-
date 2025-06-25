@@ -1,65 +1,12 @@
-# Excel Analytics Platform - Frontend
+# React + Vite
 
-This is the frontend for the Excel Analytics Platform, a powerful tool for uploading, analyzing, and visualizing Excel data with interactive dashboards and advanced charting features.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## ✨ Features
-- User authentication (JWT-based)
-- Upload and manage Excel files
-- Interactive dashboards with advanced chart types (2D, 3D, pie, doughnut, column, etc.)
-- Download and save chart images
-- Admin and user roles
-- Responsive, modern UI with dark mode
+Currently, two official plugins are available:
 
-## 🚀 Getting Started
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
+## Expanding the ESLint configuration
 
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone <your-repo-url>
-   cd excel-analytics-frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-## 🏗 Project Structure
-```
-excel-analytics-frontend/
-├── public/                # Static assets
-├── src/
-│   ├── Components/        # React components (User/Admin, charts, auth, etc.)
-│   ├── Context/           # React context (Auth)
-│   ├── services/          # API service functions
-│   ├── endpoint/          # API base URLs
-│   ├── assets/            # Images and static assets
-│   ├── App.jsx            # Main app component
-│   ├── main.jsx           # Entry point
-│   └── index.css          # Global styles
-├── package.json           # Project dependencies
-├── vite.config.js         # Vite config
-└── README.md              # Project documentation
-```
-
-## 🧑‍💻 Usage
-- Register or log in as a user or admin
-- Upload Excel files and view them in your dashboard
-- Analyze data and create interactive charts
-- Download or save charts to your dashboard
-
-## 🛠 Tech Stack
-- React + Vite
-- Tailwind CSS
-- Chart.js and custom Canvas rendering
-- Framer Motion (animations)
-
-## 📄 License
-MIT
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.

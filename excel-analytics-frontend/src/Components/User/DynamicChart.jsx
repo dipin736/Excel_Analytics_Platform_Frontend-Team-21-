@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, memo, useState } from 'react';
 import {
   Chart as ChartJS,
   Title,
@@ -13,7 +13,10 @@ import {
   Filler,
 } from "chart.js";
 import { Bar, Pie, Line, Scatter } from "react-chartjs-2";
-
+import { FiDownload, FiSave } from 'react-icons/fi';
+import { toast } from 'react-toastify';
+import { saveChartConfiguration, createDashboard } from '../../services/chartApi';
+import AdvancedChartRenderer from './AdvancedChartRenderer';
 
 // Register ChartJS components
 ChartJS.register(
@@ -29,311 +32,532 @@ ChartJS.register(
   Filler
 );
 
-// Tailwind-inspired color palette
-const COLORS = {
-  blue: {
-    500: '#3B82F6',
-    400: '#60A5FA',
-    300: '#93C5FD',
+// Color schemes for different chart types
+const colorSchemes = {
+  light: {
+    bar: {
+      background: [
+        'rgba(99, 102, 241, 0.6)',
+        'rgba(168, 85, 247, 0.6)',
+        'rgba(236, 72, 153, 0.6)',
+        'rgba(14, 165, 233, 0.6)',
+        'rgba(20, 184, 166, 0.6)',
+      ],
+      border: [
+        'rgba(99, 102, 241, 1)',
+        'rgba(168, 85, 247, 1)',
+        'rgba(236, 72, 153, 1)',
+        'rgba(14, 165, 233, 1)',
+        'rgba(20, 184, 166, 1)',
+      ]
+    },
+    line: {
+      background: 'rgba(99, 102, 241, 0.1)',
+      border: 'rgba(99, 102, 241, 1)'
+    },
+    pie: {
+      background: [
+        'rgba(99, 102, 241, 0.8)',
+        'rgba(168, 85, 247, 0.8)',
+        'rgba(236, 72, 153, 0.8)',
+        'rgba(14, 165, 233, 0.8)',
+        'rgba(20, 184, 166, 0.8)',
+      ],
+      border: '#ffffff'
+    },
+    scatter: {
+      background: 'rgba(99, 102, 241, 0.6)',
+      border: 'rgba(99, 102, 241, 1)'
+    },
+    area: {
+      background: 'rgba(99, 102, 241, 0.1)',
+      border: 'rgba(99, 102, 241, 1)'
+    },
+    column: {
+      background: [
+        'rgba(99, 102, 241, 0.6)',
+        'rgba(168, 85, 247, 0.6)',
+        'rgba(236, 72, 153, 0.6)',
+        'rgba(14, 165, 233, 0.6)',
+        'rgba(20, 184, 166, 0.6)',
+      ],
+      border: [
+        'rgba(99, 102, 241, 1)',
+        'rgba(168, 85, 247, 1)',
+        'rgba(236, 72, 153, 1)',
+        'rgba(14, 165, 233, 1)',
+        'rgba(20, 184, 166, 1)',
+      ]
+    },
+    doughnut: {
+      background: [
+        'rgba(99, 102, 241, 0.8)',
+        'rgba(168, 85, 247, 0.8)',
+        'rgba(236, 72, 153, 0.8)',
+        'rgba(14, 165, 233, 0.8)',
+        'rgba(20, 184, 166, 0.8)',
+      ],
+      border: '#ffffff'
+    }
   },
-  indigo: {
-    500: '#6366F1',
-    400: '#818CF8',
-  },
-  violet: {
-    500: '#8B5CF6',
-  },
-  pink: {
-    500: '#EC4899',
-  },
-  rose: {
-    500: '#F43F5E',
-  },
-  amber: {
-    500: '#F59E0B',
-  },
-  emerald: {
-    500: '#10B981',
-  },
-  cyan: {
-    500: '#06B6D4',
-  },
+  dark: {
+    bar: {
+      background: [
+        'rgba(129, 140, 248, 0.8)',
+        'rgba(192, 132, 252, 0.8)',
+        'rgba(244, 114, 182, 0.8)',
+        'rgba(56, 189, 248, 0.8)',
+        'rgba(45, 212, 191, 0.8)',
+      ],
+      border: [
+        'rgba(129, 140, 248, 1)',
+        'rgba(192, 132, 252, 1)',
+        'rgba(244, 114, 182, 1)',
+        'rgba(56, 189, 248, 1)',
+        'rgba(45, 212, 191, 1)',
+      ]
+    },
+    line: {
+      background: 'rgba(129, 140, 248, 0.2)',
+      border: 'rgba(129, 140, 248, 1)'
+    },
+    pie: {
+      background: [
+        'rgba(129, 140, 248, 0.9)',
+        'rgba(192, 132, 252, 0.9)',
+        'rgba(244, 114, 182, 0.9)',
+        'rgba(56, 189, 248, 0.9)',
+        'rgba(45, 212, 191, 0.9)',
+      ],
+      border: '#374151'
+    },
+    scatter: {
+      background: 'rgba(129, 140, 248, 0.8)',
+      border: 'rgba(129, 140, 248, 1)'
+    },
+    area: {
+      background: 'rgba(129, 140, 248, 0.2)',
+      border: 'rgba(129, 140, 248, 1)'
+    },
+    column: {
+      background: [
+        'rgba(129, 140, 248, 0.8)',
+        'rgba(192, 132, 252, 0.8)',
+        'rgba(244, 114, 182, 0.8)',
+        'rgba(56, 189, 248, 0.8)',
+        'rgba(45, 212, 191, 0.8)',
+      ],
+      border: [
+        'rgba(129, 140, 248, 1)',
+        'rgba(192, 132, 252, 1)',
+        'rgba(244, 114, 182, 1)',
+        'rgba(56, 189, 248, 1)',
+        'rgba(45, 212, 191, 1)',
+      ]
+    },
+    doughnut: {
+      background: [
+        'rgba(129, 140, 248, 0.9)',
+        'rgba(192, 132, 252, 0.9)',
+        'rgba(244, 114, 182, 0.9)',
+        'rgba(56, 189, 248, 0.9)',
+        'rgba(45, 212, 191, 0.9)',
+      ],
+      border: '#374151'
+    }
+  }
 };
 
-const DynamicChart = ({ data, chartType, xAxis, yAxis,darkMode, xAxisColor, yAxisColor }) => {
-  // Generate gradient colors for bars/lines
-  const generateGradient = (ctx, chartArea) => {
-    if (!chartArea) return COLORS.blue[400];
-    
-    const gradient = ctx.createLinearGradient(
-      0, chartArea.bottom, 0, chartArea.top
-    );
-    gradient.addColorStop(0, COLORS.blue[500]);
-    gradient.addColorStop(0.7, COLORS.blue[300]);
-    gradient.addColorStop(1, COLORS.blue[400]);
-    return gradient;
-  };
+const DynamicChart = memo(({ data, chartType, xAxis, yAxis, zAxis, darkMode, chartControls, title, config, fileId, sheetName }) => {
+  const chartRef = useRef(null);
+  const chartInstanceRef = useRef(null);
+  const prevConfigRef = useRef(null);
+  const [saving, setSaving] = useState(false);
 
-  // Pie chart colors
-  const pieColors = [
-    COLORS.rose[500],
-    COLORS.indigo[500],
-    COLORS.amber[500],
-    COLORS.emerald[500],
-    COLORS.violet[500],
-    COLORS.cyan[500],
-    COLORS.pink[500],
-    COLORS.blue[500],
+  // Advanced chart types that use the AdvancedChartRenderer
+  const advancedChartTypes = [
+    'waterfall', '3d-pie', 'pie', 'doughnut', 'gauge', 'funnel', 'radar', 'bubble', 
+    'heatmap', 'treemap', 'arc', '3d-column'
   ];
 
-  const chartData = {
-    labels: data.map((item) => item[xAxis]),
-    datasets: [
-      {
-        label: yAxis,
-        data: data.map((item) => parseFloat(item[yAxis]) || 0),
-        backgroundColor: (context) => {
-          const chart = context.chart;
-          const { ctx, chartArea } = chart;
-          
-          if (chartType === "pie") {
-            return pieColors;
-          } else if (chartType === "bar") {
-            return generateGradient(ctx, chartArea);
-          } else {
-            return COLORS.blue[400];
-          }
-        },
-        borderColor: chartType === "pie" 
-          ? pieColors.map(color => `${color}CC`)
-          : COLORS.blue[500],
-        borderWidth: chartType === "pie" ? 1 : 2,
-        fill: chartType === "line" ? {
-          target: 'origin',
-          above: (context) => {
-            const chart = context.chart;
-            const { ctx, chartArea } = chart;
-            const gradient = ctx.createLinearGradient(
-              0, chartArea.bottom, 0, chartArea.top
-            );
-            gradient.addColorStop(0, `${COLORS.blue[500]}33`);
-            gradient.addColorStop(1, `${COLORS.blue[500]}10`);
-            return gradient;
-          }
-        } : false,
-        pointBackgroundColor: COLORS.blue[500],
-        pointBorderColor: '#fff',
-        pointRadius: 5,
-        pointHoverRadius: 7,
-        pointHitRadius: 10,
-        tension: chartType === "line" ? 0.4 : 0,
-        borderRadius: chartType === "bar" ? 6 : 0,
-        borderSkipped: false,
-      },
-    ],
-  };
+  useEffect(() => {
+    if (!data || !chartType || !xAxis || !yAxis || !chartRef.current) return;
 
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: {
-      duration: 1000,
-      easing: 'easeOutQuart',
-      delay: (context) => {
-        if (context.type === 'data' && context.mode === 'default') {
-          return context.dataIndex * 100;
+    try {
+      // Destroy existing chart instance before creating a new one
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.destroy();
+        chartInstanceRef.current = null;
+      }
+
+      // Create a config string to compare changes
+      const currentConfig = JSON.stringify({ 
+        data: data.map(d => ({ x: d[xAxis], y: d[yAxis] })), 
+        chartType, 
+        darkMode 
+      });
+      
+      if (prevConfigRef.current === currentConfig) return;
+      prevConfigRef.current = currentConfig;
+
+      const ctx = chartRef.current.getContext('2d');
+      
+      // Create gradient for area and line charts
+      let gradient = null;
+      if (chartType === 'area' || chartType === 'line') {
+        gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        if (darkMode) {
+          gradient.addColorStop(0, 'rgba(129, 140, 248, 0.3)');
+          gradient.addColorStop(1, 'rgba(129, 140, 248, 0.02)');
+        } else {
+          gradient.addColorStop(0, 'rgba(99, 102, 241, 0.2)');
+          gradient.addColorStop(1, 'rgba(99, 102, 241, 0.02)');
         }
-        return 0;
-      },
-    },
-    plugins: {
-      legend: {
-        position: "top",
-        labels: {
-          font: {
-            size: 14,
-            family: "'Inter', sans-serif",
-          },
-          color: '#374151',
-          padding: 20,
-          usePointStyle: true,
-          pointStyle: 'circle',
-        },
-      },
-      title: {
-        display: true,
-        text: `${xAxis} vs ${yAxis}`,
-        color: '#111827',
-        font: {
-          size: 18,
-          family: "'Inter', sans-serif",
-          weight: "600",
-        },
-        padding: { top: 20, bottom: 20 },
-        align: "center",
-      },
-      tooltip: {
-        backgroundColor: '#ffffff',
-        titleColor: '#111827',
-        bodyColor: '#374151',
-        borderColor: '#E5E7EB',
-        borderWidth: 1,
-        padding: 12,
-        cornerRadius: 8,
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        titleFont: {
-          family: "'Inter', sans-serif",
-          size: 14,
-          weight: '600',
-        },
-        bodyFont: {
-          family: "'Inter', sans-serif",
-          size: 13,
-        },
-        callbacks: {
-          label: (context) => {
-            let label = context.dataset.label || "";
-            if (label) {
-              label += ": ";
+      }
+
+      const colors = darkMode ? colorSchemes.dark : colorSchemes.light;
+      const chartColors = colors[chartType] || colors.bar; // Fallback to bar colors if chart type not found
+
+      // Validate and process data
+      const validData = data.filter(d => 
+        d[xAxis] !== undefined && 
+        d[xAxis] !== null && 
+        d[yAxis] !== undefined && 
+        d[yAxis] !== null
+      );
+
+      if (validData.length === 0) {
+        if (chartInstanceRef.current) {
+          chartInstanceRef.current.destroy();
+          chartInstanceRef.current = null;
+        }
+        return;
+      }
+
+      // Generate colors for pie/doughnut charts
+      const generatePieColors = (dataLength) => {
+        return validData.map((_, i) => {
+          const hue = (i * 360) / dataLength;
+          return `hsla(${hue}, 70%, ${darkMode ? '65%' : '60%'}, 0.8)`;
+        });
+      };
+
+      const chartData = {
+        labels: validData.map(d => d[xAxis]),
+        datasets: [{
+          label: yAxis,
+          data: validData.map(d => d[yAxis]),
+          backgroundColor: chartType === 'pie' || chartType === 'doughnut' 
+            ? generatePieColors(validData.length)
+            : chartType === 'area' 
+              ? gradient 
+              : chartType === 'line' 
+                ? 'transparent' 
+                : chartColors?.background || chartColors?.background?.[0] || 'rgba(99, 102, 241, 0.6)',
+          borderColor: chartType === 'pie' || chartType === 'doughnut'
+            ? darkMode ? '#374151' : '#ffffff'
+            : chartColors?.border || chartColors?.border?.[0] || 'rgba(99, 102, 241, 1)',
+          borderWidth: chartType === 'line' ? 3 : chartType === 'pie' || chartType === 'doughnut' ? 2 : 2,
+          tension: chartType === 'line' ? 0 : chartType === 'area' ? 0.4 : 0.4, // Sharp lines for line charts, smooth for area
+          pointRadius: chartType === 'scatter' ? 6 : chartType === 'line' ? 4 : 3, // Slightly larger points for line charts
+          pointHoverRadius: chartType === 'scatter' ? 8 : chartType === 'line' ? 6 : 5,
+          pointBackgroundColor: chartColors?.border || chartColors?.border?.[0] || 'rgba(99, 102, 241, 1)', // Make points visible
+          pointBorderColor: darkMode ? '#374151' : '#ffffff', // Border around points
+          pointBorderWidth: chartType === 'line' ? 2 : 1,
+          fill: chartType === 'area',
+          hoverOffset: chartType === 'pie' || chartType === 'doughnut' ? 4 : 0, // Hover effect for pie charts
+        }]
+      };
+
+      const chartConfig = {
+        type: chartType === 'area' ? 'line' : chartType === 'column' ? 'bar' : chartType,
+        data: chartData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: chartType === 'bar' ? 'y' : 'x', // Horizontal bars vs vertical columns
+          animation: {
+            duration: 750,
+            easing: 'easeOutQuart',
+            onComplete: function() {
+              // Cache the chart image for potential exports
+              if (this.canvas) {
+                this.canvas.dataURL = this.canvas.toDataURL('image/png');
+              }
             }
-            const value = context.parsed.y ?? context.parsed;
-            if (typeof value === 'number' && !isNaN(value)) {
-              label += new Intl.NumberFormat(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }).format(value);
-            } else {
-              label += value !== null && value !== undefined ? value : 'N/A';
+          },
+          scales: chartType !== 'pie' ? {
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                drawBorder: false
+              },
+              ticks: {
+                color: darkMode ? '#9CA3AF' : '#4B5563',
+                padding: 10,
+                callback: function(value) {
+                  // Format large numbers with K/M/B suffixes
+                  if (Math.abs(value) >= 1000000000) {
+                    return (value / 1000000000).toFixed(1) + 'B';
+                  }
+                  if (Math.abs(value) >= 1000000) {
+                    return (value / 1000000).toFixed(1) + 'M';
+                  }
+                  if (Math.abs(value) >= 1000) {
+                    return (value / 1000).toFixed(1) + 'K';
+                  }
+                  return value;
+                }
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                color: darkMode ? '#9CA3AF' : '#4B5563',
+                padding: 10,
+                maxRotation: 45,
+                minRotation: 45,
+                autoSkip: true,
+                maxTicksLimit: 20
+              }
             }
-            return label;
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
-        title: {
-          display: true,
-          text: xAxis,
-          color: '#374151',
-          font: {
-            size: 14,
-            family: "'Inter', sans-serif",
-            weight: "500",
-          },
-          padding: { top: 10, bottom: 5 },
-        },
-        ticks: {
-          color: '#6B7280',
-          font: {
-            size: 12,
-            family: "'Inter', sans-serif",
-          },
-          autoSkip: true,
-          maxTicksLimit: 10,
-          maxRotation: 45,
-          minRotation: 0,
-        },
-        grid: {
-          drawBorder: false,
-          color: '#E5E7EB',
-        },
-      },
-      y: {
-        title: {
-          display: true,
-          text: yAxis,
-          color: '#374151',
-          font: {
-            size: 14,
-            family: "'Inter', sans-serif",
-            weight: "500",
-          },
-          padding: { top: 5, bottom: 10 },
-        },
-        ticks: {
-          color: '#6B7280',
-          font: {
-            size: 12,
-            family: "'Inter', sans-serif",
-          },
-          padding: 5,
-          callback: (value) => {
-            if (value >= 1000) {
-              return `${value/1000}k`;
+          } : undefined,
+          plugins: {
+            legend: {
+              display: chartType === 'pie' || chartType === 'doughnut',
+              position: 'bottom',
+              labels: {
+                color: darkMode ? '#9CA3AF' : '#4B5563',
+                padding: 20,
+                font: {
+                  size: 12
+                },
+                generateLabels: function(chart) {
+                  const labels = ChartJS.defaults.plugins.legend.labels.generateLabels(chart);
+                  const colors = darkMode ? colorSchemes.dark : colorSchemes.light;
+                  const chartColors = colors[chartType] || colors.bar;
+                  return labels.map(label => ({
+                    ...label,
+                    fillStyle: chartColors?.background || chartColors?.background?.[0] || 'rgba(99, 102, 241, 0.6)',
+                    strokeStyle: chartColors?.border || chartColors?.border?.[0] || 'rgba(99, 102, 241, 1)'
+                  }));
+                }
+              }
+            },
+            tooltip: {
+              backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+              titleColor: darkMode ? '#F3F4F6' : '#1F2937',
+              bodyColor: darkMode ? '#D1D5DB' : '#4B5563',
+              borderColor: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+              borderWidth: 1,
+              padding: 12,
+              cornerRadius: 8,
+              displayColors: true,
+              usePointStyle: true,
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  const value = context.parsed.y !== undefined ? context.parsed.y : context.parsed;
+                  // Format large numbers
+                  if (Math.abs(value) >= 1000000000) {
+                    label += (value / 1000000000).toFixed(2) + 'B';
+                  } else if (Math.abs(value) >= 1000000) {
+                    label += (value / 1000000).toFixed(2) + 'M';
+                  } else if (Math.abs(value) >= 1000) {
+                    label += (value / 1000).toFixed(2) + 'K';
+                  } else {
+                    label += value;
+                  }
+                  return label;
+                }
+              }
             }
-            return value;
           }
-        },
-        grid: {
-          drawBorder: false,
-          color: '#E5E7EB',
-        },
-      },
-    },
-    layout: {
-      padding: {
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: 20,
-      },
-    },
-    elements: {
-      line: {
-        borderWidth: 3,
-      },
-      point: {
-        radius: 5,
-        hoverRadius: 8,
-        backgroundColor: COLORS.blue[500],
-        borderWidth: 2,
-      },
-    },
-  };
-  const StaticOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-    },
-    scales: {
-      x: {
-        ticks: {
-          color: xAxisColor || (darkMode ? 'white' : 'black'), // Set color for x-axis labels
-        },
-        title: {
-          display: true,
-          text: xAxis,
-          color: xAxisColor || (darkMode ? 'white' : 'black'), // Set color for x-axis title
-        },
-      },
-      y: {
-        ticks: {
-          color: yAxisColor || (darkMode ? 'white' : 'black'), // Set color for y-axis labels
-        },
-        title: {
-          display: true,
-          text: yAxis,
-          color: yAxisColor || (darkMode ? 'white' : 'black'), // Set color for y-axis title
-        },
-      },
-    },
+        }
+      };
+
+      // Create new chart instance (previous one was destroyed above)
+      chartInstanceRef.current = new ChartJS(ctx, chartConfig);
+    } catch (error) {
+      console.error('Error rendering chart:', error);
+      // Clean up on error
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.destroy();
+        chartInstanceRef.current = null;
+      }
+    }
+
+  }, [data, chartType, xAxis, yAxis, darkMode]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.destroy();
+        chartInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Add resize handler with debounce
+  useEffect(() => {
+    let resizeTimer;
+    const handleResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (chartInstanceRef.current) {
+          chartInstanceRef.current.resize();
+        }
+      }, 250); // Debounce resize events
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimer);
+    };
+  }, []);
+
+  // Download function for basic charts
+  const downloadChart = () => {
+    try {
+      if (chartInstanceRef.current && chartInstanceRef.current.toBase64Image) {
+        const link = document.createElement('a');
+        link.download = `${chartType}-chart-${Date.now()}.png`;
+        link.href = chartInstanceRef.current.toBase64Image();
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Chart downloaded successfully!');
+      } else {
+        toast.error('Error: No chart available for download');
+      }
+    } catch (error) {
+      toast.error('Error downloading chart: ' + error.message);
+    }
   };
 
-  const chartOptions = {
-  ...options,
-  ...StaticOptions,  // Combine StaticOptions with baseOptions
-};
+  // Save function for basic charts
+  const saveToNewDashboard = async () => {
+    if (saving) return;
+    
+    try {
+      setSaving(true);
+      
+      // Create a new dashboard
+      const dashboardData = {
+        title: `Dashboard - ${title || chartType} Chart`,
+        description: `Auto-created dashboard for ${chartType} chart`
+      };
+
+      const dashboardResult = await createDashboard(dashboardData);
+      
+      if (!dashboardResult.success) {
+        throw new Error(dashboardResult.error || 'Failed to create dashboard');
+      }
+
+      // Save chart configuration
+      const chartConfig = {
+        title: title || `${chartType} Chart`,
+        chartType: chartType,
+        data: {
+          labels: data?.map(d => d[xAxis]) || [],
+          values: data?.map(d => parseFloat(d[yAxis]) || 0) || []
+        },
+        configuration: {
+          fileId: fileId,
+          sheetName: sheetName,
+          xAxis: xAxis,
+          yAxis: yAxis,
+          zAxis: zAxis,
+          interactiveSettings: {
+            darkMode: darkMode,
+            ...config
+          },
+          description: `${chartType} chart created from ${sheetName || 'data'}`
+        }
+      };
+
+      const result = await saveChartConfiguration(dashboardResult.data.data._id, chartConfig);
+      
+      if (result.success) {
+        toast.success(`Chart saved to dashboard "${dashboardResult.data.data.title}" successfully!`);
+      } else {
+        throw new Error(result.error || 'Failed to save chart');
+      }
+    } catch (error) {
+      toast.error('Failed to save chart to dashboard');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Use AdvancedChartRenderer for advanced chart types
+  if (advancedChartTypes.includes(chartType)) {
+    return (
+      <AdvancedChartRenderer
+        data={data}
+        chartType={chartType}
+        xAxis={xAxis}
+        yAxis={yAxis}
+        zAxis={zAxis}
+        darkMode={darkMode}
+        chartControls={chartControls}
+        title={title}
+        config={config}
+        fileId={fileId}
+        sheetName={sheetName}
+      />
+    );
+  }
+
   return (
-    <div className="h-96 w-full animate-fade-in">
-      {chartType === "bar" && <Bar data={chartData} options={chartOptions} />}
-      {chartType === "pie" && <Pie data={chartData} options={chartOptions} />}
-      {chartType === "line" && <Line data={chartData} options={chartOptions} />}
-      {chartType === "scatter" && <Scatter data={chartData} options={chartOptions} />}
+    <div className="w-full h-full flex flex-col">
+      {/* Download and Save Controls for Basic Charts */}
+      <div className={`mb-3 p-3 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+        <div className="flex items-center gap-2 justify-end">
+          <button
+            onClick={downloadChart}
+            className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${darkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'} cursor-pointer`}
+            title="Download as PNG"
+            type="button"
+          >
+            <FiDownload size={16} />
+            <span className="text-sm">Download</span>
+          </button>
+          <button
+            onClick={saveToNewDashboard}
+            disabled={saving}
+            className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              saving 
+                ? 'bg-gray-400 cursor-not-allowed text-white'
+                : darkMode 
+                  ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' 
+                  : 'bg-green-500 hover:bg-green-600 text-white cursor-pointer'
+            }`}
+            title="Save to Dashboard"
+            type="button"
+          >
+            <FiSave size={16} />
+            <span className="text-sm">{saving ? 'Saving...' : 'Save'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Chart Container */}
+      <div className="flex-1">
+        <canvas ref={chartRef} />
+      </div>
     </div>
   );
-};
+});
+
+DynamicChart.displayName = 'DynamicChart';
 
 export default DynamicChart;
