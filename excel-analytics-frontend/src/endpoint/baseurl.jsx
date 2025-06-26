@@ -1,2 +1,2 @@
-export const BaseUrl = "https://excel-analytics-platform.netlify.app/api/auth/"; 
-export const BaseUrluser = "https://excel-analytics-platform.netlify.app/api"; 
+export const BaseUrl = "http://localhost:5000/api/auth/"; 
+export const BaseUrluser = "http://localhost:5000/api"; 
