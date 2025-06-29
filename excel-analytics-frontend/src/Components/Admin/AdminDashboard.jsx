@@ -14,6 +14,15 @@ import {
   FiSun,
   FiMoon,
   FiLogOut,
+  FiUserPlus,
+  FiShield,
+  FiActivity,
+  FiFileText,
+  FiGrid,
+  FiChevronLeft,
+  FiChevronRight,
+  FiHelpCircle,
+  FiX
 } from "react-icons/fi";
 import DynamicChart from "../User/DynamicChart";
 import { BaseUrluser } from "../../endpoint/baseurl";
@@ -22,17 +31,131 @@ import { toast } from "react-toastify";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../../Context/AuthContext.jsx";
 import { useNavigate } from "react-router-dom";
-import UsersManagement from "./UsersManagement";
+import UsersManagement from "./EnhancedUsersManagement";
+import SecurityAudit from "./SecurityAudit";
 
+// Enhanced Admin Dashboard with modern UI
 const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [darkMode, setDarkMode] = useState(true);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+  const [showShortcutsList, setShowShortcutsList] = useState(false);
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
+
+  // Navigation items with icons and descriptions
+  const navigationItems = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: FiHome,
+      description: "Overview & Analytics"
+    },
+    {
+      id: "users",
+      label: "User Management",
+      icon: FiUsers,
+      description: "Manage Users & Permissions"
+    },
+    {
+      id: "security",
+      label: "Security & Audit",
+      icon: FiShield,
+      description: "Security & Activity Logs"
+    }
+  ];
+
+  // Theme configuration
+  const themeClasses = {
+    background: darkMode ? "bg-gray-900" : "bg-gray-50",
+    sidebar: darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200",
+    card: darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200",
+    textPrimary: darkMode ? "text-white" : "text-gray-800",
+    textSecondary: darkMode ? "text-gray-300" : "text-gray-600",
+    textMuted: darkMode ? "text-gray-400" : "text-gray-500",
+    border: darkMode ? "border-gray-700" : "border-gray-200",
+    hover: darkMode ? "hover:bg-gray-700" : "hover:bg-gray-50",
+    input: darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-800 border-gray-300"
+  };
+
+  // Fetch admin statistics - only once on mount
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${BaseUrluser}/dashboard/admin/stats`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch admin stats");
+        }
+
+        const data = await response.json();
+        const stats = data.data;
+
+        const dynamicMetrics = [
+          {
+            title: "Total Users",
+            value: stats.users.total.toString(),
+            change: `+${stats.users.new} this month`,
+            trend: "up",
+            icon: FiUsers,
+            color: "blue"
+          },
+          {
+            title: "Active Users",
+            value: stats.users.active.toString(),
+            change: "Last 7 days",
+            trend: "up",
+            icon: FiActivity,
+            color: "green"
+          },
+          {
+            title: "Total Dashboards",
+            value: stats.dashboards.total.toString(),
+            change: `${stats.dashboards.public} public`,
+            trend: "up",
+            icon: FiGrid,
+            color: "purple"
+          },
+          {
+            title: "Files Stored",
+            value: stats.files.total.toString(),
+            change: `${(stats.files.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB used`,
+            trend: "up",
+            icon: FiDatabase,
+            color: "orange"
+          }
+        ];
+
+        setMetrics(dynamicMetrics);
+      } catch (err) {
+        console.error("Failed to fetch admin stats:", err);
+        setError(err.message);
+        toast.error("Failed to load admin statistics");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []); // Empty dependency array - only run once
+
+  // Handlers
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    setUser(null);
+    toast.info("Logged out successfully");
+    navigate("/login");
+  };
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -40,587 +163,324 @@ const AdminDashboard = () => {
     localStorage.setItem("darkMode", JSON.stringify(newMode));
   };
 
-  const fetchExcelFiles = async () => {
-    const response = await fetch(`${BaseUrluser}/users/`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-    return await response.json();
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
   };
 
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
 
-  useEffect(() => {
-    const savedMode = JSON.parse(localStorage.getItem("darkMode"));
-    if (savedMode !== null) {
-      setDarkMode(savedMode);
-    } else if (
-      window.matchMedia &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches
-    ) {
-      setDarkMode(true);
+  // Navigation item component - simplified
+  const NavItem = ({ item, isActive, onClick }) => (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+        isActive
+          ? "bg-indigo-600 text-white shadow-lg"
+          : `${themeClasses.textSecondary} ${themeClasses.hover}`
+      }`}
+      type="button"
+    >
+      <item.icon className="w-5 h-5 flex-shrink-0" />
+      {sidebarOpen && (
+        <div className="flex-1 text-left min-w-0">
+          <div className="font-medium truncate">{item.label}</div>
+          <div className={`text-xs ${isActive ? "text-indigo-100" : themeClasses.textMuted} truncate`}>
+            {item.description}
+          </div>
+        </div>
+      )}
+    </button>
+  );
+
+  // Metric card component
+  const MetricCard = ({ metric }) => {
+    const colorClasses = {
+      blue: "bg-blue-500",
+      green: "bg-green-500",
+      purple: "bg-purple-500",
+      orange: "bg-orange-500"
+    };
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`${themeClasses.card} rounded-xl p-6 border shadow-sm`}
+        whileHover={{ y: -5, transition: { duration: 0.2 } }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>
+              {metric.title}
+            </p>
+            <p className={`text-3xl font-bold mt-1 ${themeClasses.textPrimary}`}>
+              {metric.value}
+            </p>
+            <p className={`text-xs mt-1 ${themeClasses.textMuted}`}>
+              {metric.change}
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg ${colorClasses[metric.color]} bg-opacity-10`}>
+            <metric.icon className={`w-6 h-6 ${colorClasses[metric.color].replace('bg-', 'text-')}`} />
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Render content based on active tab
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return (
+          <div className="space-y-6">
+            {/* Welcome Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`${themeClasses.card} rounded-xl p-6 border`}
+            >
+              <h1 className={`text-2xl font-bold ${themeClasses.textPrimary}`}>
+                Welcome back, {user?.name}!
+              </h1>
+              <p className={`mt-2 ${themeClasses.textSecondary}`}>
+                Here's what's happening with your Excel Analytics Platform
+              </p>
+            </motion.div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {metrics.map((metric, index) => (
+                <MetricCard key={index} metric={metric} />
+              ))}
+            </div>
+
+            {/* Quick Actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`${themeClasses.card} rounded-xl p-6 border`}
+            >
+              <h2 className={`text-lg font-semibold mb-4 ${themeClasses.textPrimary}`}>
+                Quick Actions
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setActiveTab("users")}
+                  className="flex items-center space-x-3 p-4 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                  type="button"
+                >
+                  <FiUserPlus className="w-5 h-5 text-indigo-600" />
+                  <span className="text-indigo-700 font-medium">Manage Users</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab("security")}
+                  className="flex items-center space-x-3 p-4 rounded-lg bg-red-50 hover:bg-red-100 transition-colors"
+                  type="button"
+                >
+                  <FiShield className="w-5 h-5 text-red-600" />
+                  <span className="text-red-700 font-medium">Security & Audit</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+
+      case "users":
+        return <UsersManagement darkMode={darkMode} themeClasses={themeClasses} />;
+
+      case "security":
+        return <SecurityAudit darkMode={darkMode} themeClasses={themeClasses} />;
+
+      default:
+        return null;
     }
-    fetchExcelFiles();
-  }, []);
-
-  // Sample data
-  const usersData = [
-    { month: "Jan", users: 1200, revenue: 45000 },
-    { month: "Feb", users: 1800, revenue: 52000 },
-    { month: "Mar", users: 2100, revenue: 61000 },
-    { month: "Apr", users: 2400, revenue: 73000 },
-    { month: "May", users: 2900, revenue: 85000 },
-    { month: "Jun", users: 3500, revenue: 92000 },
-  ];
-
-  const [metrics, setMetrics] = useState([]);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await axios.get(`${BaseUrluser}/dashboard/admin/stats/`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`, 
-          },
-        });
-
-        const stats = res.data.data;
-
-  
-        const dynamicMetrics = [
-          {
-            title: "Total Users",
-            value: stats.users.total.toString(),
-            change: `+${stats.users.new}`,
-            trend: stats.users.new > 0 ? "up" : "down",
-          },
-          {
-            title: "Active Users",
-            value: stats.users.active.toString(),
-            change: "",
-            trend: "up",
-          },
-          {
-            title: "Dashboards",
-            value: stats.dashboards.total.toString(),
-            change: "",
-            trend: "up",
-          },
-          {
-            title: "Public Dashboards",
-            value: stats.dashboards.public.toString(),
-            change: "",
-            trend: "up",
-          },
-          {
-            title: "Files Stored",
-            value: stats.files.total.toString(),
-            change: "",
-            trend: "up",
-          },
-          {
-            title: "Storage Used",
-            value: `${(stats.files.storageUsed / (1024 * 1024)).toFixed(2)} MB`,
-            change: "",
-            trend: "up",
-          },
-        ];
-
-        setMetrics(dynamicMetrics);
-      } catch (error) {
-        console.error("Failed to fetch admin stats:", error);
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  // Theme classes
-  const themeClasses = {
-    background: darkMode ? "bg-gray-900" : "bg-gray-50",
-    sidebar: darkMode ? "bg-gray-800" : "bg-blue-800",
-    card: darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800",
-    header: darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800",
-    textPrimary: darkMode ? "text-white" : "text-gray-800",
-    textSecondary: darkMode ? "text-gray-300" : "text-gray-600",
-    border: darkMode ? "border-gray-700" : "border-gray-200",
-    input: darkMode
-      ? "bg-gray-700 text-white border-gray-600"
-      : "bg-white text-gray-800 border-gray-300",
-    tableHeader: darkMode
-      ? "bg-gray-700 text-gray-300"
-      : "bg-gray-50 text-gray-500",
-    tableRow: darkMode
-      ? "bg-gray-800 hover:bg-gray-700"
-      : "bg-white hover:bg-gray-50",
-    successBadge: darkMode
-      ? "bg-green-900 text-green-200"
-      : "bg-green-100 text-green-800",
-    logoutButton: darkMode
-      ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
-      : "bg-gradient-to-r from-red-400 to-red-500 hover:from-red-500 hover:to-red-600",
   };
-  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
-  const [lastActivity, setLastActivity] = useState(Date.now());
-  const [sessionTimeout, setSessionTimeout] = useState(null);
-  const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
-  // Session timeout management
-  useEffect(() => {
-    const resetTimeout = () => {
-      setLastActivity(Date.now());
-    };
-
-    // Add event listeners for user activity
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    events.forEach(event => {
-      window.addEventListener(event, resetTimeout);
-    });
-
-    // Check for inactivity
-    const checkInactivity = setInterval(() => {
-      const timeNow = Date.now();
-      const timeSinceLastActivity = timeNow - lastActivity;
-      
-      if (timeSinceLastActivity >= INACTIVITY_TIMEOUT) {
-        clearInterval(checkInactivity);
-        toast.warning("Your session is about to expire due to inactivity");
-        setSessionTimeout(setTimeout(() => {
-          toast.error("Session expired due to inactivity");
-          handleLogout();
-        }, 60000)); // Give them 1 minute warning
-      }
-    }, 60000); // Check every minute
-
-    return () => {
-      events.forEach(event => {
-        window.removeEventListener(event, resetTimeout);
-      });
-      clearInterval(checkInactivity);
-      if (sessionTimeout) clearTimeout(sessionTimeout);
-    };
-  }, [lastActivity]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    setUser(null);
-    toast.info("You have been logged out successfully");
-    navigate("/login");
-  };
+  if (loading) {
+    return (
+      <div className={`min-h-screen ${themeClasses.background} flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className={`mt-4 ${themeClasses.textSecondary}`}>Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex h-screen ${themeClasses.background}`}>
+    <div className={`min-h-screen ${themeClasses.background} flex`}>
       {/* Sidebar */}
-      <motion.div
-        animate={{ width: sidebarOpen ? 256 : 80 }} 
-        transition={{ duration: 0.3 }}
-        className={`${themeClasses.sidebar} text-white h-full transition-all`}
+      <motion.aside
+        initial={{ width: sidebarOpen ? 280 : 80 }}
+        animate={{ width: sidebarOpen ? 280 : 80 }}
+        className={`${themeClasses.sidebar} border-r transition-all duration-300 flex flex-col h-screen sticky top-0`}
       >
-        <div className="p-4 flex items-center justify-between">
-          {sidebarOpen && <h1 className="text-xl font-bold">AdminPanel</h1>}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-opacity-20 "
-          >
-            <FiMenu size={20} />
-          </button>
-        </div>
-
-        <nav className="mt-8">
-          <NavItem
-            icon={<FiHome />}
-            text="Dashboard"
-            active={activeTab === "dashboard"}
-            onClick={() => setActiveTab("dashboard")}
-            expanded={sidebarOpen}
-            darkMode={darkMode}
-          />
-          <NavItem
-            icon={<FiUsers />}
-            text="Users"
-            active={activeTab === "users"}
-            onClick={() => setActiveTab("users")}
-            expanded={sidebarOpen}
-            darkMode={darkMode}
-          />
-          {/* <NavItem
-            icon={<FiDatabase />}
-            text="Data"
-            active={activeTab === "data"}
-            onClick={() => setActiveTab("data")}
-            expanded={sidebarOpen}
-            darkMode={darkMode}
-          />
-          <NavItem
-            icon={<FiBarChart2 />}
-            text="Analytics"
-            active={activeTab === "analytics"}
-            onClick={() => setActiveTab("analytics")}
-            expanded={sidebarOpen}
-            darkMode={darkMode}
-          />
-          <NavItem
-            icon={<FiSettings />}
-            text="Settings"
-            active={activeTab === "settings"}
-            onClick={() => setActiveTab("settings")}
-            expanded={sidebarOpen}
-            darkMode={darkMode}
-          /> */}
-        </nav>
-        <div className="mt-6">
-          <NavItem
-            icon={<FiLogOut />}
-            text="Logout"
-            active={false}
-            onClick={() => setShowLogoutConfirmation(true)}
-            expanded={sidebarOpen}
-            darkMode={darkMode}
-          />
-        </div>
-        <AnimatePresence>
-          {showLogoutConfirmation && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50"
-            >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 100, damping: 16 }}
-                className={`${themeClasses.modal} rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl border`}
-              >
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="p-2 rounded-full bg-red-100 animate-pulse-slow">
-                    <FiLogOut className="text-red-500 text-xl" />
-                  </div>
-                  <h3
-                    className={`text-xl font-semibold ${themeClasses.modalText}`}
-                  >
-                    Confirm Logout
-                  </h3>
-                </div>
-                <p
-                  className={`${
-                    darkMode ? "text-gray-100" : "text-gray-200"
-                  } mb-6`}
-                >
-                  Are you sure you want to log out?
-                </p>
-                <div className="flex justify-end gap-3">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: "spring", stiffness: 130, damping: 17 }}
-                    onClick={() => setShowLogoutConfirmation(false)}
-                    className={`px-4 py-2 ${
-                      themeClasses.button
-                    } rounded-lg transition-all shadow-sm ${
-                      darkMode ? "text-gray-100" : "text-gray-100"
-                    }`}
-                  >
-                    Cancel
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: "spring", stiffness: 130, damping: 17 }}
-                    onClick={handleLogout}
-                    className={`px-4 py-2 ${themeClasses.logoutButton} text-white rounded-lg transition-all shadow-md`}
-                  >
-                    Logout
-                  </motion.button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        {/* Top Navigation */}
-        <motion.header
-          initial={{ y: -30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className={`${themeClasses.header} shadow-sm p-4 flex justify-between items-center`}
-        >
-          <h2 className={`text-xl font-semibold ${themeClasses.textPrimary}`}>
-            {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-          </h2>
-
-          <div className="flex items-center space-x-4">
-            {/* Theme Toggle moved here */}
-            <div className="relative">
-              <FiSearch
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
-                  darkMode ? "text-gray-400" : "text-gray-500"
-                }`}
-              />
-              <input
-                type="text"
-                placeholder="Search..."
-                className={`pl-10 pr-4 py-2 rounded-lg border ${themeClasses.input} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-              />
-            </div>
-
+        {/* Header */}
+        <div className="p-6 border-b border-gray-700 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <h1 className={`text-xl font-bold ${sidebarOpen ? "block" : "hidden"}`}>
+              Admin Panel
+            </h1>
             <button
-              className={`p-2 rounded-full ${
-                darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
-              } relative`}
+              onClick={toggleSidebar}
+              className="p-2 rounded-lg hover:bg-gray-700 transition-colors"
+              type="button"
             >
-              <FiBell
-                size={20}
-                className={darkMode ? "text-gray-300" : "text-gray-600"}
-              />
-              <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
+              {sidebarOpen ? <FiChevronLeft /> : <FiChevronRight />}
             </button>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {navigationItems.map((item) => (
+            <NavItem
+              key={item.id}
+              item={item}
+              isActive={activeTab === item.id}
+              onClick={() => handleTabChange(item.id)}
+            />
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-700 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => setShowLogoutConfirmation(true)}
+              className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors"
+              type="button"
+            >
+              <FiLogOut />
+              {sidebarOpen && <span>Logout</span>}
+            </button>
+            <button
+              onClick={() => setShowShortcutsList(true)}
+              className="p-2 text-gray-300 hover:text-white transition-colors"
+              title="Keyboard shortcuts"
+              type="button"
+            >
+              <FiHelpCircle />
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
             <button
               onClick={toggleDarkMode}
-              className={`p-2 rounded-lg ${
-                darkMode
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-blue-100 hover:bg-blue-200"
-              } transition-colors`}
-              aria-label={
-                darkMode ? "Switch to light mode" : "Switch to dark mode"
-              }
+              className="p-2 rounded-lg hover:bg-gray-700 transition-colors"
+              type="button"
             >
-              {darkMode ? (
-                <FiSun className="text-yellow-300" size={20} />
-              ) : (
-                <FiMoon className="text-blue-700" size={20} />
-              )}
+              {darkMode ? <FiSun /> : <FiMoon />}
             </button>
-
-            <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
-                A
+            {sidebarOpen && (
+              <div className="text-xs text-gray-400">
+                Admin Panel
               </div>
-              {sidebarOpen && (
-                <span className={darkMode ? "text-gray-300" : "text-gray-700"}>
-                  {user.name}
-                </span>
-              )}
+            )}
+          </div>
+        </div>
+      </motion.aside>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Top Bar */}
+        <header className={`${themeClasses.card} border-b p-4 flex items-center justify-between flex-shrink-0`}>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={toggleSidebar}
+              className="p-2 rounded-lg hover:bg-gray-700 transition-colors"
+              type="button"
+            >
+              <FiMenu />
+            </button>
+            <div>
+              <h2 className={`text-lg font-semibold ${themeClasses.textPrimary}`}>
+                {navigationItems.find(item => item.id === activeTab)?.label}
+              </h2>
+              <p className={`text-sm ${themeClasses.textSecondary}`}>
+                {navigationItems.find(item => item.id === activeTab)?.description}
+              </p>
             </div>
           </div>
-        </motion.header>
+          <div className="flex items-center space-x-2">
+            <div className={`text-sm ${themeClasses.textSecondary}`}>
+              Admin: {user?.name}
+            </div>
+          </div>
+        </header>
 
-        {/* Dashboard Content */}
-        <motion.main
-          key={activeTab} // triggers animation on tab change
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="p-6"
-        >
-          {activeTab === "dashboard" && (
-            <>
-              {/* Metrics Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {metrics.map((metric, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <MetricCard
-                      title={metric.title}
-                      value={metric.value}
-                      change={metric.change}
-                      trend={metric.trend}
-                      darkMode={darkMode}
-                    />
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Charts Section */}
-              <motion.h1
-                initial={{ opacity: 0, y: -20 }}
+        {/* Content Area */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="text-4xl font-bold text-center text-indigo-600 mb-8"
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
               >
-                📊 Charts to Display Static, Illustrative Data
-              </motion.h1>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <motion.div
-                  className={`${themeClasses.card} p-6 rounded-xl shadow-sm`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <h3
-                    className={`text-lg font-medium mb-4 ${themeClasses.textPrimary}`}
-                  >
-                    User Growth
-                  </h3>
-                  <div className="h-80">
-                    <DynamicChart
-                      data={usersData}
-                      chartType="line"
-                      xAxis="month"
-                      yAxis="users"
-                      darkMode={darkMode}
-                      xAxisColor="red"   
-                      yAxisColor="blue"  
-                    />
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  className={`${themeClasses.card} p-6 rounded-xl shadow-sm`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <h3
-                    className={`text-lg font-medium mb-4 ${themeClasses.textPrimary}`}
-                  >
-                    Revenue Sources
-                  </h3>
-                  <div className="h-80">
-                    <DynamicChart
-                      data={usersData}
-                      chartType="bar"
-                      xAxis="month"
-                      yAxis="revenue"
-                      darkMode={darkMode}
-                    />
-                  </div>
-                </motion.div>
-              </div>
-            </>
-          )}
-
-          {activeTab === "users" && (
-            <UsersManagement darkMode={darkMode} themeClasses={themeClasses} />
-          )}
-          {activeTab === "data" && (
-            <DataManagement darkMode={darkMode} themeClasses={themeClasses} />
-          )}
-          {activeTab === "analytics" && (
-            <AnalyticsDashboard
-              darkMode={darkMode}
-              themeClasses={themeClasses}
-            />
-          )}
-          {activeTab === "settings" && (
-            <SettingsPanel darkMode={darkMode} themeClasses={themeClasses} />
-          )}
-        </motion.main>
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </main>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {showLogoutConfirmation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`max-w-md w-full ${themeClasses.card} rounded-xl shadow-2xl p-6`}
+            >
+              <div className="text-center">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FiLogOut className="w-8 h-8 text-red-600 dark:text-red-400" />
+                </div>
+                <h3 className={`text-xl font-semibold mb-2 ${themeClasses.textPrimary}`}>
+                  Confirm Logout
+                </h3>
+                <p className={`${themeClasses.textSecondary} mb-6`}>
+                  Are you sure you want to logout? Any unsaved changes will be lost.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowLogoutConfirmation(false)}
+                    className={`flex-1 px-4 py-2 border rounded-lg transition-colors ${
+                      darkMode
+                        ? "border-gray-600 text-gray-300 hover:bg-gray-700"
+                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
+                    type="button"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
-
-// Reusable Components
-const NavItem = ({ icon, text, active, onClick, expanded, darkMode }) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center w-full p-4 ${
-      active
-        ? darkMode
-          ? "bg-gray-700"
-          : "bg-blue-700"
-        : darkMode
-        ? "hover:bg-gray-700"
-        : "hover:bg-blue-700"
-    } transition-colors`}
-  >
-    <span className="mr-3">{icon}</span>
-    {expanded && <span>{text}</span>}
-  </button>
-);
-
-const MetricCard = ({ title, value, change, trend, darkMode }) => (
-  <div
-    className={`${
-      darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"
-    } p-6 rounded-xl shadow-sm`}
-  >
-    <h3
-      className={`${
-        darkMode ? "text-gray-400" : "text-gray-500"
-      } text-sm font-medium mb-1`}
-    >
-      {title}
-    </h3>
-    <p className="text-2xl font-bold mb-2">{value}</p>
-    <div
-      className={`flex items-center ${
-        trend === "up" ? "text-green-500" : "text-red-500"
-      }`}
-    >
-      {trend === "up" ? (
-        <svg
-          className="w-4 h-4 mr-1"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 15l7-7 7 7"
-          />
-        </svg>
-      ) : (
-        <svg
-          className="w-4 h-4 mr-1"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-      )}
-      <span className="text-sm">{change}</span>
-    </div>
-  </div>
-);
-
-
-
-const DataManagement = ({ darkMode, themeClasses }) => (
-  <div className={`${themeClasses.card} p-6 rounded-xl shadow-sm`}>
-    <h2 className={`text-xl font-semibold mb-6 ${themeClasses.textPrimary}`}>
-      Data Management
-    </h2>
-    {/* Data management content */}
-  </div>
-);
-
-const AnalyticsDashboard = ({ darkMode, themeClasses }) => (
-  <div className={`${themeClasses.card} p-6 rounded-xl shadow-sm`}>
-    <h2 className={`text-xl font-semibold mb-6 ${themeClasses.textPrimary}`}>
-      Analytics Dashboard
-    </h2>
-    {/* Analytics content */}
-  </div>
-);
-
-const SettingsPanel = ({ darkMode, themeClasses }) => (
-  <div className={`${themeClasses.card} p-6 rounded-xl shadow-sm`}>
-    <h2 className={`text-xl font-semibold mb-6 ${themeClasses.textPrimary}`}>
-      Settings
-    </h2>
-    {/* Settings content */}
-  </div>
-);
 
 export default AdminDashboard;

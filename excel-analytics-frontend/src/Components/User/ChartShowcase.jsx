@@ -2,45 +2,55 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import DynamicChart from './DynamicChart';
 import InteractiveChartControls from './InteractiveChartControls';
-import { FiBarChart2, FiPieChart, FiTrendingUp } from 'react-icons/fi';
+import { FiBarChart2, FiPieChart, FiTrendingUp, FiCircle } from 'react-icons/fi';
 
 const ChartShowcase = ({ darkMode = false }) => {
-  const [selectedChart, setSelectedChart] = useState('waterfall');
+  const [selectedChart, setSelectedChart] = useState('bar');
   const [filteredData, setFilteredData] = useState(null);
 
   // Sample data for different chart types
   const sampleData = {
-    waterfall: [
+    bar: [
       { period: 'Q1 Start', value: 100 },
       { period: 'Revenue', value: 50 },
       { period: 'Costs', value: -20 },
       { period: 'Profit', value: 30 },
       { period: 'Q1 End', value: 160 }
     ],
-    gauge: [
-      { metric: 'Performance', value: 85, target: 100 },
-      { metric: 'Efficiency', value: 92, target: 100 }
+    column: [
+      { period: 'Q1 Start', value: 100 },
+      { period: 'Revenue', value: 50 },
+      { period: 'Costs', value: -20 },
+      { period: 'Profit', value: 30 },
+      { period: 'Q1 End', value: 160 }
     ],
-    funnel: [
-      { stage: 'Visitors', value: 10000 },
-      { stage: 'Leads', value: 5000 },
-      { stage: 'Prospects', value: 2000 },
-      { stage: 'Customers', value: 500 }
+    line: [
+      { period: 'Q1 Start', value: 100 },
+      { period: 'Revenue', value: 50 },
+      { period: 'Costs', value: -20 },
+      { period: 'Profit', value: 30 },
+      { period: 'Q1 End', value: 160 }
     ],
-    radar: [
-      { skill: 'JavaScript', score: 85 },
-      { skill: 'React', score: 90 },
-      { skill: 'Python', score: 75 },
-      { skill: 'SQL', score: 80 },
-      { skill: 'Analytics', score: 95 }
+    area: [
+      { period: 'Q1 Start', value: 100 },
+      { period: 'Revenue', value: 50 },
+      { period: 'Costs', value: -20 },
+      { period: 'Profit', value: 30 },
+      { period: 'Q1 End', value: 160 }
     ],
-    bubble: [
-      { product: 'A', sales: 1000, profit: 200, marketShare: 15 },
-      { product: 'B', sales: 800, profit: 150, marketShare: 12 },
-      { product: 'C', sales: 1200, profit: 180, marketShare: 18 },
-      { product: 'D', sales: 600, profit: 100, marketShare: 8 }
+    scatter: [
+      { x: 1, y: 1 },
+      { x: 2, y: 3 },
+      { x: 3, y: 2 },
+      { x: 4, y: 4 },
+      { x: 5, y: 1 }
     ],
-    '3d-pie': [
+    pie: [
+      { category: 'Desktop', users: 45 },
+      { category: 'Mobile', users: 35 },
+      { category: 'Tablet', users: 20 }
+    ],
+    doughnut: [
       { category: 'Desktop', users: 45 },
       { category: 'Mobile', users: 35 },
       { category: 'Tablet', users: 20 }
@@ -49,45 +59,51 @@ const ChartShowcase = ({ darkMode = false }) => {
 
   // Chart configurations
   const chartConfigs = {
-    waterfall: {
+    bar: {
       title: 'Quarterly Financial Waterfall',
-      chartType: 'waterfall',
+      chartType: 'bar',
       xAxis: 'period',
       yAxis: 'value',
       description: 'Shows cumulative impact of positive and negative changes'
     },
-    gauge: {
+    column: {
       title: 'Performance Dashboard',
-      chartType: 'gauge',
-      xAxis: 'metric',
+      chartType: 'column',
+      xAxis: 'period',
       yAxis: 'value',
       description: 'Displays metrics against targets with visual indicators'
     },
-    funnel: {
+    line: {
       title: 'Sales Conversion Funnel',
-      chartType: 'funnel',
-      xAxis: 'stage',
+      chartType: 'line',
+      xAxis: 'period',
       yAxis: 'value',
       description: 'Visualizes conversion rates through process stages'
     },
-    radar: {
+    area: {
       title: 'Skills Assessment Radar',
-      chartType: 'radar',
-      xAxis: 'skill',
-      yAxis: 'score',
+      chartType: 'area',
+      xAxis: 'period',
+      yAxis: 'value',
       description: 'Multi-dimensional comparison across multiple categories'
     },
-    bubble: {
+    scatter: {
       title: 'Product Performance Matrix',
-      chartType: 'bubble',
-      xAxis: 'sales',
-      yAxis: 'profit',
-      zAxis: 'marketShare',
+      chartType: 'scatter',
+      xAxis: 'x',
+      yAxis: 'y',
       description: 'Three-dimensional data visualization with bubble sizes'
     },
-    '3d-pie': {
+    pie: {
       title: 'User Device Distribution',
-      chartType: '3d-pie',
+      chartType: 'pie',
+      xAxis: 'category',
+      yAxis: 'users',
+      description: 'Enhanced pie chart with 3D visual effects'
+    },
+    doughnut: {
+      title: 'User Device Distribution',
+      chartType: 'doughnut',
       xAxis: 'category',
       yAxis: 'users',
       description: 'Enhanced pie chart with 3D visual effects'
@@ -108,12 +124,13 @@ const ChartShowcase = ({ darkMode = false }) => {
   };
 
   const chartTypes = [
-    { key: 'waterfall', label: 'Waterfall Chart', icon: FiTrendingUp, color: 'bg-cyan-500' },
-    { key: 'gauge', label: 'Gauge Chart', icon: FiBarChart2, color: 'bg-red-500' },
-    { key: 'funnel', label: 'Funnel Chart', icon: FiTrendingUp, color: 'bg-yellow-500' },
-    { key: 'radar', label: 'Radar Chart', icon: FiBarChart2, color: 'bg-lime-500' },
-    { key: 'bubble', label: 'Bubble Chart', icon: FiBarChart2, color: 'bg-sky-500' },
-    { key: '3d-pie', label: '3D Pie Chart', icon: FiPieChart, color: 'bg-purple-600' }
+    { key: 'bar', label: 'Bar Chart', icon: FiBarChart2, color: 'bg-blue-500' },
+    { key: 'column', label: 'Column Chart', icon: FiBarChart2, color: 'bg-blue-600' },
+    { key: 'line', label: 'Line Chart', icon: FiTrendingUp, color: 'bg-green-500' },
+    { key: 'area', label: 'Area Chart', icon: FiTrendingUp, color: 'bg-teal-500' },
+    { key: 'scatter', label: 'Scatter Plot', icon: FiCircle, color: 'bg-orange-500' },
+    { key: 'pie', label: 'Pie Chart', icon: FiPieChart, color: 'bg-purple-500' },
+    { key: 'doughnut', label: 'Doughnut', icon: FiPieChart, color: 'bg-pink-500' }
   ];
 
   const currentData = filteredData || sampleData[selectedChart];
@@ -192,7 +209,6 @@ const ChartShowcase = ({ darkMode = false }) => {
             chartType={currentConfig.chartType}
             xAxis={currentConfig.xAxis}
             yAxis={currentConfig.yAxis}
-            zAxis={currentConfig.zAxis}
             darkMode={darkMode}
             title={currentConfig.title}
             config={{

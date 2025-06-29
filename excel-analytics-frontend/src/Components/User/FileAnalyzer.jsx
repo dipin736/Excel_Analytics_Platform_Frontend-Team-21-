@@ -62,30 +62,7 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
       color: "purple",
       charts: [
         { type: "pie", name: "2D Pie Chart", icon: "🥧", description: "Show proportions" },
-        { type: "3d-pie", name: "3D Pie Chart", icon: "🎂", description: "Enhanced pie with depth" },
         { type: "doughnut", name: "Doughnut Chart", icon: "🍩", description: "Pie with center hole" }
-      ]
-    },
-    "3d": {
-      title: "3D Charts",
-      icon: FiLayers,
-      color: "green",
-      charts: [
-        { type: "3d-bar", name: "3D Bar Chart", icon: "🧱", description: "3D bar visualization" },
-        { type: "3d-column", name: "3D Column Chart", icon: "🏗️", description: "3D vertical bars" },
-        { type: "3d-scatter", name: "3D Scatter Plot", icon: "💎", description: "Three-dimensional data" }
-      ]
-    },
-    professional: {
-      title: "Professional Charts",
-      icon: FiTarget,
-      color: "indigo",
-      charts: [
-        { type: "waterfall", name: "Waterfall Chart", icon: "💧", description: "Show cumulative changes" },
-        { type: "funnel", name: "Funnel Chart", icon: "🎪", description: "Conversion analysis" },
-        { type: "gauge", name: "Gauge Chart", icon: "⏱️", description: "KPI dashboard dials" },
-        { type: "radar", name: "Radar Chart", icon: "🎯", description: "Multi-dimensional comparison" },
-        { type: "bubble", name: "Bubble Chart", icon: "🫧", description: "Three-variable analysis" }
       ]
     }
   };

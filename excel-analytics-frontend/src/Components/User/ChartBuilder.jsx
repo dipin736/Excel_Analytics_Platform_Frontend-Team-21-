@@ -87,23 +87,7 @@ const ChartBuilder = ({
     
     // Pie Charts
     { type: 'pie', label: 'Pie Chart', icon: FiPieChart, color: 'bg-purple-500' },
-    { type: '3d-pie', label: '3D Pie Chart', icon: FiPieChart, color: 'bg-purple-600' },
     { type: 'doughnut', label: 'Doughnut', icon: FiPieChart, color: 'bg-pink-500' },
-    
-    // 3D Charts
-    { type: '3d-bar', label: '3D Bar', icon: FiBox, color: 'bg-indigo-500' },
-    { type: '3d-column', label: '3D Column', icon: FiBox, color: 'bg-indigo-600' },
-    { type: '3d-scatter', label: '3D Scatter', icon: FiCircle, color: 'bg-violet-500' },
-    
-    // Advanced Professional Charts
-    { type: 'waterfall', label: 'Waterfall Chart', icon: FiTrendingUp, color: 'bg-cyan-500' },
-    { type: 'funnel', label: 'Funnel Chart', icon: FiTrendingUp, color: 'bg-yellow-500' },
-    { type: 'gauge', label: 'Gauge/Dial Chart', icon: FiCircle, color: 'bg-red-500' },
-    { type: 'arc', label: 'Arc Chart', icon: FiCircle, color: 'bg-emerald-500' },
-    { type: 'radar', label: 'Radar Chart', icon: FiCircle, color: 'bg-lime-500' },
-    { type: 'bubble', label: 'Bubble Chart', icon: FiCircle, color: 'bg-sky-500' },
-    { type: 'heatmap', label: 'Heat Map', icon: FiBox, color: 'bg-rose-500' },
-    { type: 'treemap', label: 'Tree Map', icon: FiBox, color: 'bg-amber-500' }
   ];
 
   // Add chart style presets
@@ -330,8 +314,12 @@ const ChartBuilder = ({
     setIsLoading(true);
 
     try {
+      // Map chart types for backend compatibility
+      const backendChartType = chartConfig.chartType === 'column' ? 'bar' : chartConfig.chartType;
+      
       const configToSave = {
         ...chartConfig,
+        chartType: backendChartType,
         data: chartData,
         excelId: excelId,
         createdAt: new Date().toISOString()

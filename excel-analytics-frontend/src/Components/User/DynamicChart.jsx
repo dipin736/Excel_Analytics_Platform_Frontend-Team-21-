@@ -176,8 +176,7 @@ const DynamicChart = memo(({ data, chartType, xAxis, yAxis, zAxis, darkMode, cha
 
   // Advanced chart types that use the AdvancedChartRenderer
   const advancedChartTypes = [
-    'waterfall', '3d-pie', 'pie', 'doughnut', 'gauge', 'funnel', 'radar', 'bubble', 
-    'heatmap', 'treemap', 'arc', '3d-column'
+    'pie', 'doughnut'
   ];
 
   useEffect(() => {
@@ -462,10 +461,13 @@ const DynamicChart = memo(({ data, chartType, xAxis, yAxis, zAxis, darkMode, cha
         throw new Error(dashboardResult.error || 'Failed to create dashboard');
       }
 
+      // Map chart types for backend compatibility
+      const backendChartType = chartType === 'column' ? 'bar' : chartType;
+
       // Save chart configuration
       const chartConfig = {
         title: title || `${chartType} Chart`,
-        chartType: chartType,
+        chartType: backendChartType,
         data: {
           labels: data?.map(d => d[xAxis]) || [],
           values: data?.map(d => parseFloat(d[yAxis]) || 0) || []
@@ -483,6 +485,9 @@ const DynamicChart = memo(({ data, chartType, xAxis, yAxis, zAxis, darkMode, cha
           description: `${chartType} chart created from ${sheetName || 'data'}`
         }
       };
+
+      // Debug log to see what's being sent
+      console.log('Saving chart config:', chartConfig);
 
       const result = await saveChartConfiguration(dashboardResult.data.data._id, chartConfig);
       

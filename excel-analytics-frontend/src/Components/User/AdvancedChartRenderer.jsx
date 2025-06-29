@@ -47,6 +47,7 @@ const AdvancedChartRenderer = memo(({
   fileId,
   sheetName
 }) => {
+  const canvasRef = useRef(null);
   const chartRef = useRef(null);
   const d3ContainerRef = useRef(null);
 
@@ -503,28 +504,31 @@ const AdvancedChartRenderer = memo(({
   // Universal save function for all chart types
   const saveToNewDashboard = async () => {
     if (saving) return;
-    
     try {
       setSaving(true);
-      
       // Create a new dashboard - try simpler structure
       const dashboardData = {
         title: `Dashboard - ${title || chartType} Chart`,
         description: `Auto-created dashboard for ${chartType} chart`
       };
-
       const dashboardResult = await createDashboard(dashboardData);
-      
       if (!dashboardResult.success) {
         throw new Error(dashboardResult.error || 'Failed to create dashboard');
       }
-
+      // Get chart image (for custom canvas charts)
+      let previewImage = null;
+      if (canvasRef && canvasRef.current) {
+        previewImage = canvasRef.current.toDataURL('image/png');
+      }
+      
+      // Map chart types for backend compatibility
+      const backendChartType = chartType === 'column' ? 'bar' : chartType;
+      
       // Save chart configuration
       const chartConfig = {
         title: title || `${chartType} Chart`,
-        chartType: chartType,
+        chartType: backendChartType,
         data: {
-          // Include the current data for reference
           labels: data?.map(d => d[xAxis]) || [],
           values: data?.map(d => parseFloat(d[yAxis]) || 0) || []
         },
@@ -534,20 +538,15 @@ const AdvancedChartRenderer = memo(({
           xAxis: xAxis,
           yAxis: yAxis,
           zAxis: zAxis,
-          // Store interactive settings in configuration
           interactiveSettings: {
             darkMode: darkMode,
-            rotation: rotation,
-            zoom: zoom,
-            tiltAngle: tiltAngle,
             ...config
           },
           description: `${chartType} chart created from ${sheetName || 'data'}`
-        }
+        },
+        previewImage // Add preview image for dashboard
       };
-
       const result = await saveChartConfiguration(dashboardResult.data.data._id, chartConfig);
-      
       if (result.success) {
         toast.success(`Chart saved to dashboard "${dashboardResult.data.data.title}" successfully!`);
       } else {
@@ -1059,385 +1058,6 @@ const AdvancedChartRenderer = memo(({
     );
   };
 
-  // 3D Column Chart Renderer with static 3D view
-  const render3DColumnChart = () => {
-    const canvasRef = useRef(null);
-
-    // 3D column chart rendering effect
-    useEffect(() => {
-      if (chartType !== '3d-column' || !canvasRef.current || !data || data.length === 0) return;
-
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      
-      // Get container dimensions
-      const container = canvas.parentElement;
-      const containerWidth = container?.offsetWidth || 600;
-      const containerHeight = container?.offsetHeight || 400;
-      
-      // Responsive canvas sizing
-      const width = canvas.width = Math.min(containerWidth * 0.95, 800);
-      const height = canvas.height = Math.min(containerHeight * 0.85, 500);
-
-      // Margins for axis and labels
-      const marginLeft = 60;
-      const marginRight = 40;
-      const marginTop = 40;
-      const marginBottom = 60;
-
-      // Calculate data
-      const values = data.map(d => {
-        const val = parseFloat(d[yAxis]);
-        return isNaN(val) ? 0 : val;
-      });
-      const labels = data.map(d => d[xAxis] || 'Unknown');
-      const maxValue = Math.max(...values);
-      const minValue = Math.min(...values);
-
-      // 3D column parameters
-      const chartWidth = width - marginLeft - marginRight;
-      const chartHeight = height - marginTop - marginBottom;
-      const baseY = height - marginBottom; // Flat X-axis at bottom
-      // Dynamically calculate column width/spacing
-      const minColWidth = 6;
-      const maxColWidth = 30;
-      let columnWidth = Math.max(minColWidth, Math.min(maxColWidth, chartWidth / (data.length * 1.3)));
-      let spacing = columnWidth * 1.3;
-      // If still doesn't fit, squeeze more
-      if (spacing * (data.length - 1) + columnWidth > chartWidth) {
-        spacing = (chartWidth - columnWidth) / (data.length - 1);
-      }
-      const columnDepth = Math.max(8, Math.min(18, columnWidth * 0.6)); // Depth proportional to width
-      const maxHeight = chartHeight * 0.7;
-      const startX = marginLeft + (chartWidth - (data.length - 1) * spacing - columnWidth) / 2;
-
-      // Color palettes
-      const colors = data.map((_, i) => {
-        const hue = (i * 360) / data.length;
-        const saturation = 75 - (i % 3) * 5;
-        const lightness = 65 + (i % 2) * 8;
-        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-      });
-      const shadowColors = data.map((_, i) => {
-        const hue = (i * 360) / data.length;
-        const saturation = 75 - (i % 3) * 5;
-        return `hsl(${hue}, ${saturation}%, 40%)`;
-      });
-      const highlightColors = data.map((_, i) => {
-        const hue = (i * 360) / data.length;
-        const saturation = 75 - (i % 3) * 5;
-        return `hsl(${hue}, ${saturation}%, 75%)`;
-      });
-
-      // Clear canvas
-      ctx.clearRect(0, 0, width, height);
-
-      // Draw X-axis (horizontal line)
-      ctx.strokeStyle = darkMode ? '#f3f4f6' : '#1f2937';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(marginLeft, baseY);
-      ctx.lineTo(width - marginRight, baseY);
-      ctx.stroke();
-
-      // Draw 3D columns
-      data.forEach((item, index) => {
-        const value = values[index];
-        const normalizedHeight = maxValue > 0 ? (value - minValue) / (maxValue - minValue) : 0.5;
-        const colHeight = normalizedHeight * maxHeight;
-        const x = startX + index * spacing;
-        const y = baseY;
-
-        // 3D corners (isometric)
-        const corners = [
-          { x: x, y: y },
-          { x: x + columnWidth, y: y },
-          { x: x + columnWidth + columnDepth, y: y - columnDepth },
-          { x: x + columnDepth, y: y - columnDepth },
-          { x: x, y: y - colHeight },
-          { x: x + columnWidth, y: y - colHeight },
-          { x: x + columnWidth + columnDepth, y: y - colHeight - columnDepth },
-          { x: x + columnDepth, y: y - colHeight - columnDepth }
-        ];
-
-        // Draw right face (shadow)
-        ctx.fillStyle = shadowColors[index];
-        ctx.beginPath();
-        ctx.moveTo(corners[1].x, corners[1].y);
-        ctx.lineTo(corners[2].x, corners[2].y);
-        ctx.lineTo(corners[6].x, corners[6].y);
-        ctx.lineTo(corners[5].x, corners[5].y);
-        ctx.closePath();
-        ctx.fill();
-
-        // Draw left face (highlight)
-        ctx.fillStyle = highlightColors[index];
-        ctx.beginPath();
-        ctx.moveTo(corners[0].x, corners[0].y);
-        ctx.lineTo(corners[3].x, corners[3].y);
-        ctx.lineTo(corners[7].x, corners[7].y);
-        ctx.lineTo(corners[4].x, corners[4].y);
-        ctx.closePath();
-        ctx.fill();
-
-        // Draw top face (lightest)
-        ctx.fillStyle = colors[index];
-        ctx.beginPath();
-        ctx.moveTo(corners[4].x, corners[4].y);
-        ctx.lineTo(corners[5].x, corners[5].y);
-        ctx.lineTo(corners[6].x, corners[6].y);
-        ctx.lineTo(corners[7].x, corners[7].y);
-        ctx.closePath();
-        ctx.fill();
-
-        // Draw front face if column is thin (to avoid hollow look)
-        if (columnWidth < 12) {
-          ctx.fillStyle = colors[index];
-          ctx.beginPath();
-          ctx.moveTo(corners[0].x, corners[0].y);
-          ctx.lineTo(corners[1].x, corners[1].y);
-          ctx.lineTo(corners[5].x, corners[5].y);
-          ctx.lineTo(corners[4].x, corners[4].y);
-          ctx.closePath();
-          ctx.globalAlpha = 0.7;
-          ctx.fill();
-          ctx.globalAlpha = 1.0;
-        }
-
-        // Draw borders for definition
-        ctx.strokeStyle = darkMode ? '#4b5563' : '#ffffff';
-        ctx.lineWidth = 1;
-        const edges = [
-          [0, 1], [1, 2], [2, 3], [3, 0],
-          [4, 5], [5, 6], [6, 7], [7, 4],
-          [0, 4], [1, 5], [2, 6], [3, 7]
-        ];
-        edges.forEach(([start, end]) => {
-          ctx.beginPath();
-          ctx.moveTo(corners[start].x, corners[start].y);
-          ctx.lineTo(corners[end].x, corners[end].y);
-          ctx.stroke();
-        });
-
-        // Draw value label on top
-        if (colHeight > 30 && columnWidth > 10) {
-          ctx.fillStyle = darkMode ? '#f3f4f6' : '#1f2937';
-          ctx.font = '12px Arial';
-          ctx.textAlign = 'center';
-          const centerTopX = (corners[4].x + corners[5].x + corners[6].x + corners[7].x) / 4;
-          const centerTopY = (corners[4].y + corners[5].y + corners[6].y + corners[7].y) / 4;
-          const displayValue = isNaN(value) ? 'N/A' : value.toLocaleString();
-          ctx.fillText(displayValue, centerTopX, centerTopY - 5);
-        }
-      });
-
-      // Draw X-axis labels (smaller font for many columns)
-      ctx.fillStyle = darkMode ? '#f3f4f6' : '#1f2937';
-      ctx.font = data.length > 25 ? '10px Arial' : '13px Arial';
-      ctx.textAlign = 'center';
-      data.forEach((item, index) => {
-        const x = startX + index * spacing + columnWidth / 2;
-        const labelText = String(labels[index] || `Item ${index + 1}`);
-        let displayText = labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText;
-        if (data.length > 25 && displayText.length > 6) displayText = displayText.substring(0, 6) + '...';
-        ctx.fillText(displayText, x, baseY + 22);
-      });
-
-      // Draw Y-axis label
-      ctx.save();
-      ctx.translate(30, height / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.font = '14px Arial';
-      ctx.fillStyle = darkMode ? '#f3f4f6' : '#1f2937';
-      ctx.textAlign = 'center';
-      ctx.fillText(yAxis, 0, 0);
-      ctx.restore();
-    }, [data, xAxis, yAxis, darkMode]);
-
-    return (
-      <div className="w-full h-full flex flex-col">
-        {/* Simple Controls - Only Download and Save */}
-        <div className={`mb-3 p-3 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-          <div className="flex items-center gap-2 justify-end">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                downloadChart(canvasRef, null);
-              }}
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${darkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'} cursor-pointer`}
-              title="Download as PNG"
-              type="button"
-            >
-              <FiDownload size={16} />
-              <span className="text-sm">Download</span>
-            </button>
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                saveToNewDashboard();
-              }}
-              disabled={saving}
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                saving 
-                  ? 'bg-gray-400 cursor-not-allowed text-white'
-                  : darkMode 
-                    ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' 
-                    : 'bg-green-500 hover:bg-green-600 text-white cursor-pointer'
-              }`}
-              title="Save to Dashboard"
-              type="button"
-            >
-              <FiSave size={16} />
-              <span className="text-sm">{saving ? 'Saving...' : 'Save'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 3D Column Chart Canvas */}
-        <div className="flex-1 flex items-center justify-center">
-          <canvas 
-            ref={canvasRef}
-            className={`border rounded-lg ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
-            style={{ maxWidth: '100%', maxHeight: '100%' }}
-          />
-        </div>
-      </div>
-    );
-  };
-
-  // Standard Chart.js charts with universal controls (for non-pie charts)
-  const renderStandardChart = () => {
-    let chartInstance = null;
-
-    const chartData = {
-      labels: data?.map(d => d[xAxis]) || [],
-      datasets: [{
-        label: yAxis,
-        data: data?.map(d => parseFloat(d[yAxis]) || 0) || [],
-        backgroundColor: getColorScheme().primary,
-        borderColor: getColorScheme().primary,
-        borderWidth: 2,
-        ...(chartType === 'radar' && {
-          fill: true,
-          pointBackgroundColor: getColorScheme().primary,
-          pointBorderColor: '#fff',
-          pointHoverBackgroundColor: '#fff',
-          pointHoverBorderColor: getColorScheme().primary
-        })
-      }]
-    };
-
-    const chartOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        title: {
-          display: !!title,
-          text: title,
-          color: getColorScheme().text,
-          font: { size: 16, weight: 'bold' }
-        },
-        legend: {
-          display: chartType === 'radar',
-          position: 'bottom',
-          labels: { 
-            color: getColorScheme().text,
-            padding: 15,
-            usePointStyle: true
-          }
-        },
-        tooltip: {
-          backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-          titleColor: getColorScheme().text,
-          bodyColor: getColorScheme().text,
-          borderColor: getColorScheme().primary,
-          borderWidth: 1
-        }
-      },
-      ...(chartType === 'radar' && {
-        scales: {
-          r: {
-            beginAtZero: true,
-            grid: { color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
-            angleLines: { color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
-            ticks: { color: getColorScheme().text }
-          }
-        }
-      }),
-      animation: {
-        duration: chartControls.enableAnimation !== false ? 750 : 0,
-        onComplete: function() {
-          chartInstance = this;
-        }
-      }
-    };
-
-    const ChartComponent = {
-      'waterfall': Bar,
-      'funnel': Bar,
-      'gauge': Bar,
-      'bubble': Scatter,
-      'radar': Radar
-    }[chartType] || Bar;
-
-    return (
-      <div className="w-full h-full flex flex-col">
-        {/* Controls */}
-        <div className={`mb-3 p-3 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-          <div className="flex flex-wrap gap-3 items-center justify-between">
-            {/* Download and Save Buttons */}
-            <div className="flex items-center gap-2 ml-auto">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  downloadChart(null, chartInstance);
-                }}
-                className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${darkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'} cursor-pointer`}
-                title="Download as PNG"
-                type="button"
-              >
-                <FiDownload size={16} />
-                <span className="text-sm">Download</span>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  saveToNewDashboard();
-                }}
-                disabled={saving}
-                className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                  saving 
-                    ? 'bg-gray-400 cursor-not-allowed text-white'
-                    : darkMode 
-                      ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' 
-                      : 'bg-green-500 hover:bg-green-600 text-white cursor-pointer'
-                }`}
-                title="Save to Dashboard"
-                type="button"
-              >
-                <FiSave size={16} />
-                <span className="text-sm">{saving ? 'Saving...' : 'Save'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Chart */}
-        <div className="flex-1">
-          <ChartComponent 
-            data={chartData} 
-            options={chartOptions}
-            ref={(chart) => { if (chart) chartInstance = chart; }}
-          />
-        </div>
-      </div>
-    );
-  };
-
   // Main render function that determines which chart to show
   const renderChart = () => {
     if (!data || data.length === 0) {
@@ -1450,23 +1070,9 @@ const AdvancedChartRenderer = memo(({
       );
     }
 
-    // Enhanced 2D Pie and Doughnut charts with 3D-like features
-    if (chartType === 'pie' || chartType === 'doughnut') {
-      return renderEnhancedPieChart();
-    }
-
-    // 3D Pie Chart
-    if (chartType === '3d-pie') {
-      return render3DPieChart();
-    }
-
-    // 3D Column Chart
-    if (chartType === '3d-column') {
-      return render3DColumnChart();
-    }
-
-    // Standard Chart.js charts
-    return renderStandardChart();
+    if (chartType === '3d-pie') return render3DPieChart();
+    if (chartType === 'pie' || chartType === 'doughnut') return renderEnhancedPieChart();
+    // ... existing code ...
   };
 
   return <div className="w-full h-full">{renderChart()}</div>;
