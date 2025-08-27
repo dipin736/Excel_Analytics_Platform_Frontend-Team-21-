@@ -178,19 +178,16 @@ const Dashboard = () => {
         // Process responses
         if (statsResponse.ok) {
           const statsData = await statsResponse.json();
-          console.log('User stats received:', statsData);
           setUserStats(statsData.data || {});
         }
 
         if (dashboardsResponse.ok) {
           const dashboardsData = await dashboardsResponse.json();
-          console.log('Dashboards received:', dashboardsData);
           setDashboards(dashboardsData.data || []);
         }
 
         if (filesResponse.ok) {
           const filesData = await filesResponse.json();
-          console.log('Files received:', filesData);
           setExcelFiles(filesData.data || []);
         }
 

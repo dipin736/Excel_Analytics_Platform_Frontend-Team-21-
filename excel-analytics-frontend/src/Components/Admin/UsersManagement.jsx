@@ -31,9 +31,9 @@ import {
 import { BaseUrluser } from '../../endpoint/baseurl';
 
 const UsersManagement = ({ darkMode, themeClasses }) => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -48,34 +48,34 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
   const [formErrors, setFormErrors] = useState({});
 
   // Fetch users data
-  useEffect(() => {
+    useEffect(() => {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${BaseUrluser}/users/`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-
-      const data = await response.json();
+      const fetchUsers = async () => {
+        try {
+          setLoading(true);
+          const response = await fetch(`${BaseUrluser}/users/`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+  
+          if (!response.ok) {
+            throw new Error("Failed to fetch users");
+          }
+  
+          const data = await response.json();
       setUsers(data.data || []);
-    } catch (err) {
-      setError(err.message);
-      console.error("Error fetching users:", err);
+        } catch (err) {
+          setError(err.message);
+          console.error("Error fetching users:", err);
       toast.error("Failed to load users");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+        } finally {
+          setLoading(false);
+        }
+      };
+  
   // Filter and paginate users
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -96,12 +96,12 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
   );
 
   // Form handlers
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const handleInputChange = (e) => {
+      const { name, value, type, checked } = e.target;
     setFormData(prev => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      }));
     
     // Clear error when user starts typing
     if (formErrors[name]) {
@@ -156,38 +156,38 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
       console.error("Error creating user:", err);
       toast.error(err.message);
     }
-  };
-
-  const handleUpdateUser = async () => {
+    };
+  
+    const handleUpdateUser = async () => {
     if (!validateForm()) return;
 
-    try {
-      const response = await fetch(`${BaseUrluser}/users/${selectedUser._id}`, {
+      try {
+        const response = await fetch(`${BaseUrluser}/users/${selectedUser._id}`, {
         method: 'PUT',
-        headers: {
+          headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to update user');
-      }
-
-      const updatedUser = await response.json();
+        }
+  
+        const updatedUser = await response.json();
       setUsers(prev => prev.map(u => u._id === updatedUser.data._id ? updatedUser.data : u));
       setShowEditModal(false);
-      setSelectedUser(null);
+        setSelectedUser(null);
       setFormData({});
       toast.success('User updated successfully');
-    } catch (err) {
-      console.error("Error updating user:", err);
+      } catch (err) {
+        console.error("Error updating user:", err);
       toast.error(err.message);
-    }
-  };
-
+      }
+    };
+  
   const handleDeleteUser = async (userId) => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       return;
@@ -196,41 +196,41 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
     try {
       const response = await fetch(`${BaseUrluser}/users/${userId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to delete user');
-      }
-
+        }
+  
       setUsers(prev => prev.filter(u => u._id !== userId));
       setSelectedUsers(prev => prev.filter(id => id !== userId));
       toast.success('User deleted successfully');
-    } catch (err) {
+      } catch (err) {
       console.error("Error deleting user:", err);
       toast.error(err.message);
-    }
-  };
+      }
+    };
 
   const handleToggleUserStatus = async (userId, currentStatus) => {
-    try {
+                  try {
       const response = await fetch(`${BaseUrluser}/users/${userId}`, {
         method: 'PUT',
-        headers: {
+                        headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+                        },
         body: JSON.stringify({ isActive: !currentStatus }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
+  
+                    if (!response.ok) {
+                      const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to update user status');
-      }
-
+                    }
+  
       setUsers(prev => prev.map(u => 
         u._id === userId ? { ...u, isActive: !currentStatus } : u
       ));
@@ -245,8 +245,8 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
     if (selectedUsers.length === 0) {
       toast.warning('Please select users first');
       return;
-    }
-
+                    }
+  
     const confirmMessage = {
       delete: 'Are you sure you want to delete all selected users?',
       activate: 'Are you sure you want to activate all selected users?',
@@ -282,7 +282,7 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
       await fetchUsers(); // Refresh the list
       setSelectedUsers([]);
       toast.success(`Bulk ${action} completed successfully`);
-    } catch (err) {
+                  } catch (err) {
       console.error(`Error in bulk ${action}:`, err);
       toast.error(`Failed to ${action} users`);
     }
@@ -306,20 +306,20 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
           <h3 className={`text-xl font-semibold ${themeClasses.textPrimary}`}>
             User Details
           </h3>
-          <button
+              <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-gray-700 transition-colors"
           >
             <FiX />
-          </button>
-        </div>
+              </button>
+            </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
               <label className={`text-sm font-medium ${themeClasses.textSecondary}`}>Name</label>
               <p className={`mt-1 ${themeClasses.textPrimary}`}>{user.name}</p>
-            </div>
+          </div>
             <div>
               <label className={`text-sm font-medium ${themeClasses.textSecondary}`}>Email</label>
               <p className={`mt-1 ${themeClasses.textPrimary}`}>{user.email}</p>
@@ -376,10 +376,10 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
         <div className="mt-6 pt-6 border-t border-gray-700">
           <h4 className={`text-lg font-medium mb-4 ${themeClasses.textPrimary}`}>Quick Actions</h4>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
+        <button
+          onClick={() => {
                 onClose();
-                setSelectedUser(user);
+            setSelectedUser(user);
                 setFormData({
                   name: user.name,
                   email: user.email,
@@ -399,27 +399,27 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
             >
               <FiEdit className="w-4 h-4" />
               <span>Edit User</span>
-            </button>
-            <button
+        </button>
+        <button
               onClick={() => handleToggleUserStatus(user._id, user.isActive)}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
                 user.isActive
                   ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                   : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-            >
+          }`}
+        >
               {user.isActive ? <FiUserX className="w-4 h-4" /> : <FiUserCheck className="w-4 h-4" />}
               <span>{user.isActive ? 'Deactivate' : 'Activate'}</span>
-            </button>
-            <button
-              onClick={() => handleDeleteUser(user._id)}
+        </button>
+        <button
+          onClick={() => handleDeleteUser(user._id)}
               className="flex items-center space-x-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-            >
+        >
               <FiTrash2 className="w-4 h-4" />
               <span>Delete</span>
-            </button>
-          </div>
+        </button>
         </div>
+          </div>
       </motion.div>
     </motion.div>
   );
@@ -437,7 +437,7 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         className={`max-w-2xl w-full ${themeClasses.card} rounded-xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto`}
-      >
+                      >
         <div className="flex items-center justify-between mb-6">
           <h3 className={`text-xl font-semibold ${themeClasses.textPrimary}`}>
             {isEdit ? 'Edit User' : 'Create New User'}
@@ -449,21 +449,21 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
             <FiX />
           </button>
         </div>
-
+  
         <form onSubmit={(e) => {
           e.preventDefault();
           isEdit ? handleUpdateUser() : handleCreateUser();
         }} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+                <div>
               <label className={`block text-sm font-medium ${themeClasses.textSecondary}`}>
                 Name *
-              </label>
-              <input
-                type="text"
-                name="name"
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
                 value={formData.name || ''}
-                onChange={handleInputChange}
+                    onChange={handleInputChange}
                 className={`mt-1 w-full px-3 py-2 rounded-lg border ${themeClasses.input} ${
                   formErrors.name ? 'border-red-500' : ''
                 }`}
@@ -472,17 +472,17 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
               {formErrors.name && (
                 <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
               )}
-            </div>
-
-            <div>
+                </div>
+  
+                <div>
               <label className={`block text-sm font-medium ${themeClasses.textSecondary}`}>
                 Email *
-              </label>
-              <input
-                type="email"
-                name="email"
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
                 value={formData.email || ''}
-                onChange={handleInputChange}
+                    onChange={handleInputChange}
                 className={`mt-1 w-full px-3 py-2 rounded-lg border ${themeClasses.input} ${
                   formErrors.email ? 'border-red-500' : ''
                 }`}
@@ -491,8 +491,8 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
               {formErrors.email && (
                 <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
               )}
-            </div>
-
+                </div>
+  
             {!isEdit && (
               <>
                 <div>
@@ -537,20 +537,20 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
 
             <div>
               <label className={`block text-sm font-medium ${themeClasses.textSecondary}`}>
-                Role
-              </label>
-              <select
-                name="role"
+                    Role
+                  </label>
+                  <select
+                    name="role"
                 value={formData.role || 'user'}
-                onChange={handleInputChange}
+                    onChange={handleInputChange}
                 className={`mt-1 w-full px-3 py-2 rounded-lg border ${themeClasses.input}`}
-              >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-
-            <div>
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+  
+                <div>
               <label className={`block text-sm font-medium ${themeClasses.textSecondary}`}>
                 Age *
               </label>
@@ -581,8 +581,8 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                 onChange={handleInputChange}
                 className={`mt-1 w-full px-3 py-2 rounded-lg border ${themeClasses.input} ${
                   formErrors.gender ? 'border-red-500' : ''
-                }`}
-              >
+                    }`}
+                  >
                 <option value="">Select gender</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
@@ -596,12 +596,12 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
             <div>
               <label className={`block text-sm font-medium ${themeClasses.textSecondary}`}>
                 Phone *
-              </label>
-              <input
+                  </label>
+                  <input
                 type="tel"
                 name="phone"
                 value={formData.phone || ''}
-                onChange={handleInputChange}
+                    onChange={handleInputChange}
                 className={`mt-1 w-full px-3 py-2 rounded-lg border ${themeClasses.input} ${
                   formErrors.phone ? 'border-red-500' : ''
                 }`}
@@ -610,8 +610,8 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
               {formErrors.phone && (
                 <p className="mt-1 text-sm text-red-500">{formErrors.phone}</p>
               )}
-            </div>
-
+                </div>
+  
             <div>
               <label className={`block text-sm font-medium ${themeClasses.textSecondary}`}>
                 Company
@@ -672,30 +672,30 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                   <span className={`text-sm ${themeClasses.textSecondary}`}>
                     User is active
                   </span>
-                </label>
-              </div>
+                  </label>
+                </div>
             )}
-          </div>
-
+              </div>
+  
           <div className="flex justify-end space-x-3 pt-6 border-t border-gray-700">
-            <button
+                <button
               type="button"
               onClick={onClose}
               className={`px-4 py-2 border rounded-lg transition-colors ${
-                darkMode
+                    darkMode
                   ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
                   : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Cancel
-            </button>
-            <button
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
               type="submit"
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
-            >
+                >
               {isEdit ? 'Update User' : 'Create User'}
-            </button>
-          </div>
+                </button>
+              </div>
         </form>
       </motion.div>
     </motion.div>
@@ -707,23 +707,23 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className={`mt-4 ${themeClasses.textSecondary}`}>Loading users...</p>
-        </div>
-      </div>
+            </div>
+          </div>
     );
   }
-
+  
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+                <div>
           <h2 className={`text-2xl font-bold ${themeClasses.textPrimary}`}>
             User Management
           </h2>
           <p className={`mt-1 ${themeClasses.textSecondary}`}>
             Manage users, permissions, and account settings
-          </p>
-        </div>
+                  </p>
+                </div>
         <button
           onClick={() => {
             setFormData({});
@@ -735,8 +735,8 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
           <FiPlus className="w-4 h-4" />
           <span>Add User</span>
         </button>
-      </div>
-
+                </div>
+  
       {/* Filters and Search */}
       <div className={`${themeClasses.card} rounded-xl p-6 border`}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -749,13 +749,13 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className={`w-full pl-10 pr-4 py-2 rounded-lg border ${themeClasses.input}`}
             />
-          </div>
-          
+                </div>
+  
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
             className={`px-3 py-2 rounded-lg border ${themeClasses.input}`}
-          >
+                  >
             <option value="all">All Roles</option>
             <option value="user">Users</option>
             <option value="admin">Admins</option>
@@ -765,7 +765,7 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             className={`px-3 py-2 rounded-lg border ${themeClasses.input}`}
-          >
+                  >
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -774,11 +774,11 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
           <div className="flex items-center space-x-2">
             <span className={`text-sm ${themeClasses.textSecondary}`}>
               {filteredUsers.length} users
-            </span>
-          </div>
-        </div>
-      </div>
-
+                    </span>
+                </div>
+                  </div>
+              </div>
+  
       {/* Bulk Actions */}
       {selectedUsers.length > 0 && (
         <motion.div
@@ -791,29 +791,29 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
               {selectedUsers.length} user(s) selected
             </span>
             <div className="flex space-x-2">
-              <button
+                <button
                 onClick={() => handleBulkAction('activate')}
                 className="flex items-center space-x-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm"
-              >
+                >
                 <FiUserCheck className="w-4 h-4" />
                 <span>Activate</span>
-              </button>
+                </button>
               <button
                 onClick={() => handleBulkAction('deactivate')}
                 className="flex items-center space-x-1 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-              >
+            >
                 <FiUserX className="w-4 h-4" />
                 <span>Deactivate</span>
               </button>
-              <button
+                <button
                 onClick={() => handleBulkAction('delete')}
                 className="flex items-center space-x-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-              >
+                >
                 <FiTrash2 className="w-4 h-4" />
                 <span>Delete</span>
-              </button>
-            </div>
-          </div>
+                </button>
+              </div>
+                </div>
         </motion.div>
       )}
 
@@ -883,16 +883,16 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium">
                         {user.name.charAt(0).toUpperCase()}
-                      </div>
+                </div>
                       <div className="ml-4">
                         <div className={`text-sm font-medium ${themeClasses.textPrimary}`}>
                           {user.name}
-                        </div>
+                      </div>
                         <div className={`text-sm ${themeClasses.textSecondary}`}>
                           {user.email}
-                        </div>
                       </div>
-                    </div>
+                      </div>
+                      </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -917,7 +917,7 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                       {((user.storageUsed || 0) / (1024 * 1024)).toFixed(2)} MB
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
-                      <div
+                  <div
                         className="bg-indigo-600 h-1 rounded-full"
                         style={{
                           width: `${Math.min(((user.storageUsed || 0) / (user.storageLimit || 1)) * 100, 100)}%`
@@ -962,7 +962,7 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                         }}
                         className="p-1 text-indigo-600 hover:text-indigo-800 transition-colors"
                         title="Edit user"
-                      >
+                            >
                         <FiEdit className="w-4 h-4" />
                       </button>
                       <button
@@ -983,13 +983,13 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                       >
                         <FiTrash2 className="w-4 h-4" />
                       </button>
-                    </div>
+                                </div>
                   </td>
                 </motion.tr>
               ))}
             </tbody>
           </table>
-        </div>
+                              </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
@@ -997,7 +997,7 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
             <div className="flex items-center justify-between">
               <div className={`text-sm ${themeClasses.textSecondary}`}>
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredUsers.length)} of {filteredUsers.length} users
-              </div>
+                            </div>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
@@ -1006,8 +1006,8 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                     currentPage === 1
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-                  }`}
-                >
+                      }`}
+                    >
                   <FiChevronLeft className="w-4 h-4" />
                 </button>
                 
@@ -1020,7 +1020,7 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                         ? 'bg-indigo-600 text-white'
                         : `${themeClasses.textSecondary} hover:bg-gray-100`
                     }`}
-                  >
+                          >
                     {page}
                   </button>
                 ))}
@@ -1032,15 +1032,15 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
                     currentPage === totalPages
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-                  }`}
-                >
+                                  }`}
+                                >
                   <FiChevronRight className="w-4 h-4" />
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+                              </div>
+                            </div>
+                          </div>
+                    )}
+                  </div>
 
       {/* Modals */}
       <AnimatePresence>
@@ -1054,8 +1054,8 @@ const UsersManagement = ({ darkMode, themeClasses }) => {
           <UserDetailsModal user={selectedUser} onClose={() => setShowUserDetails(false)} />
         )}
       </AnimatePresence>
-    </div>
-  );
-};
+      </div>
+    );
+  };
 
 export default UsersManagement;

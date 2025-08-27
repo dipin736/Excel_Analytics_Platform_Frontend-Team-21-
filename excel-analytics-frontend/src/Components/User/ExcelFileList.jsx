@@ -9,15 +9,18 @@ import {
   FiX,
   FiBarChart2,
   FiTrash2,
+  FiTarget,
 } from "react-icons/fi";
 import { motion } from "framer-motion";
 
 import { BaseUrluser } from "../../endpoint/baseurl";
 import FileAnalyzer from "./FileAnalyzer";
+import ThreeDVisualizer from "./ThreeDVisualizer";
 import { toast } from "react-toastify";
 
 const ExcelFileList = ({ files, setActiveTab, darkMode }) => {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFileFor3D, setSelectedFileFor3D] = useState(null);
 
   const handleDelete = (dashboardId) => {
     toast.info(
@@ -205,6 +208,16 @@ const ExcelFileList = ({ files, setActiveTab, darkMode }) => {
                     </motion.button>
 
                     <motion.button
+                      onClick={() => setSelectedFileFor3D(file._id)}
+                      className="flex items-center gap-1 text-sm bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition-colors"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <FiTarget size={14} />
+                      3D Analysis
+                    </motion.button>
+
+                    <motion.button
                       onClick={() => handleDelete(file._id)}
                       className="flex items-center gap-1 text-sm bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors"
                       whileHover={{ scale: 1.05 }}
@@ -244,6 +257,34 @@ const ExcelFileList = ({ files, setActiveTab, darkMode }) => {
               files={files}
               darkMode={darkMode}
               onClose={() => setSelectedFile(null)}
+            />
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* 3D Visualizer Modal */}
+      {selectedFileFor3D && (
+        <motion.div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className={`rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border ${
+              darkMode
+                ? "bg-gray-800 text-gray-200 border-white/10"
+                : "bg-white text-gray-900 border-white/20"
+            }`}
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+          >
+            <ThreeDVisualizer
+              fileId={selectedFileFor3D}
+              files={files}
+              darkMode={darkMode}
+              onClose={() => setSelectedFileFor3D(null)}
             />
           </motion.div>
         </motion.div>

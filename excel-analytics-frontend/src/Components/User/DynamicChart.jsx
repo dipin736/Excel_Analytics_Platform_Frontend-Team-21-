@@ -176,7 +176,7 @@ const DynamicChart = memo(({ data, chartType, xAxis, yAxis, zAxis, darkMode, cha
 
   // Advanced chart types that use the AdvancedChartRenderer
   const advancedChartTypes = [
-    'pie', 'doughnut'
+    'pie', 'doughnut', '3d-pie'
   ];
 
   useEffect(() => {
@@ -557,7 +557,7 @@ const DynamicChart = memo(({ data, chartType, xAxis, yAxis, zAxis, darkMode, cha
 
       {/* Chart Container */}
       <div className="flex-1">
-        <canvas ref={chartRef} />
+      <canvas ref={chartRef} />
       </div>
     </div>
   );

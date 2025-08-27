@@ -87,6 +87,7 @@ const ChartBuilder = ({
     
     // Pie Charts
     { type: 'pie', label: 'Pie Chart', icon: FiPieChart, color: 'bg-purple-500' },
+    { type: '3d-pie', label: '3D Pie Chart', icon: FiPieChart, color: 'bg-indigo-500' },
     { type: 'doughnut', label: 'Doughnut', icon: FiPieChart, color: 'bg-pink-500' },
   ];
 
@@ -375,6 +376,13 @@ const ChartBuilder = ({
     }));
   };
 
+  // Debug: Log chartTypes and Pie Charts section rendering
+  console.log('ChartBuilder chartTypes:', chartTypes);
+  console.log('Current chartConfig.chartType:', chartConfig.chartType);
+
+  const pieChartTypes = chartTypes.filter(chart => ['pie', '3d-pie', 'doughnut'].includes(chart.type));
+  console.log('Pie Chart Types to render:', pieChartTypes);
+
   if (isLoading && !chartData) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -521,7 +529,40 @@ const ChartBuilder = ({
                           2D Charts
                         </h4>
                         <div className="grid grid-cols-2 gap-2">
-                          {chartTypes.filter(chart => !chart.type.startsWith('3d')).map(({ type, label, icon: Icon }) => (
+                          {chartTypes.filter(chart => !chart.type.startsWith('3d') && chart.type !== 'pie' && chart.type !== 'doughnut').map(({ type, label, icon: Icon }) => (
+                            <motion.button
+                              key={type}
+                              onClick={() => handleConfigChange('chartType', type)}
+                              className={`p-3 rounded-lg border-2 transition-all ${
+                                chartConfig.chartType === type
+                                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
+                                  : darkMode
+                                  ? 'border-gray-600 hover:border-gray-500 bg-gray-700/50'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              }`}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                            >
+                              <Icon className={`h-5 w-5 mx-auto mb-1 ${
+                                chartConfig.chartType === type ? 'text-indigo-600' : darkMode ? 'text-gray-300' : 'text-gray-600'
+                              }`} />
+                              <span className={`text-xs font-medium ${
+                                chartConfig.chartType === type ? 'text-indigo-600' : darkMode ? 'text-gray-300' : 'text-gray-600'
+                              }`}>
+                                {label}
+                              </span>
+                            </motion.button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Pie Charts Section */}
+                      <div className="mb-3">
+                        <h4 className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Pie Charts
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {pieChartTypes.map(({ type, label, icon: Icon }) => (
                             <motion.button
                               key={type}
                               onClick={() => handleConfigChange('chartType', type)}
@@ -557,7 +598,7 @@ const ChartBuilder = ({
                           </span>
                         </h4>
                         <div className="grid grid-cols-2 gap-2">
-                          {chartTypes.filter(chart => chart.type.startsWith('3d')).map(({ type, label, icon: Icon }) => (
+                          {chartTypes.filter(chart => chart.type.startsWith('3d') && chart.type !== '3d-pie').map(({ type, label, icon: Icon }) => (
                             <motion.button
                               key={type}
                               onClick={() => handleConfigChange('chartType', type)}

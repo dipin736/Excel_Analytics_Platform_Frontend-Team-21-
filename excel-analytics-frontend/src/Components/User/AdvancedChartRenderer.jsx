@@ -66,6 +66,28 @@ const AdvancedChartRenderer = memo(({
   // Chart instance refs for different chart types
   const pieChartInstanceRef = useRef(null);
 
+  // Helper: Minimum slice angle for visibility
+  const MIN_SLICE_ANGLE = 0.04; // ~2.3 degrees
+
+  // Helper: Debounce for controls
+  const debounce = (func, delay) => {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => func(...args), delay);
+    };
+  };
+
+  // Helper: Color contrast (WCAG)
+  function getContrastYIQ(hexcolor) {
+    hexcolor = hexcolor.replace('#', '');
+    const r = parseInt(hexcolor.substr(0,2),16);
+    const g = parseInt(hexcolor.substr(2,2),16);
+    const b = parseInt(hexcolor.substr(4,2),16);
+    const yiq = ((r*299)+(g*587)+(b*114))/1000;
+    return (yiq >= 128) ? '#1f2937' : '#f9fafb';
+  }
+
   // 3D pie chart rendering effect - moved to top level to fix hooks rule
   useEffect(() => {
     if (chartType !== '3d-pie' || !chartRef.current || !data || data.length === 0) return;
@@ -86,9 +108,25 @@ const AdvancedChartRenderer = memo(({
     ctx.clearRect(0, 0, width, height);
 
     // Calculate data totals and percentages
-    const values = data.map(d => parseFloat(d[yAxis]) || 0);
-    const total = values.reduce((sum, val) => sum + val, 0);
-    const percentages = values.map(val => val / total);
+    let values = data.map(d => parseFloat(d[yAxis]) || 0);
+    let total = values.reduce((sum, val) => sum + val, 0);
+    let rawPercentages = values.map(val => val / total);
+    // Enforce minimum slice angle for visibility
+    let percentages = [...rawPercentages];
+    let minAngle = MIN_SLICE_ANGLE;
+    let deficit = 0;
+    percentages = percentages.map(p => {
+      if (p * 2 * Math.PI < minAngle) {
+        deficit += minAngle - p * 2 * Math.PI;
+        return minAngle / (2 * Math.PI);
+      }
+      return p;
+    });
+    // Adjust largest slice to compensate
+    if (deficit > 0) {
+      let maxIdx = percentages.indexOf(Math.max(...percentages));
+      percentages[maxIdx] -= deficit / (2 * Math.PI);
+    }
 
     // 3D pie chart parameters with interactive controls
     const scale = Math.min(width, height) / 450;
@@ -223,20 +261,17 @@ const AdvancedChartRenderer = memo(({
         const labelX = centerX + labelDistance * Math.cos(midAngle);
         const labelY = centerY + (radiusY * 0.75) * Math.sin(midAngle) * tilt;
         
-        ctx.fillStyle = darkMode ? '#f9fafb' : '#1f2937';
+        ctx.save();
+        ctx.fillStyle = getContrastYIQ(colors[slice].startsWith('hsl') ? '#ffffff' : colors[slice]);
         ctx.font = `bold ${Math.max(9, Math.min(12, 140 / data.length))}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
-        // Text shadow
         ctx.shadowColor = darkMode ? '#000000' : '#ffffff';
         ctx.shadowBlur = 3;
         ctx.shadowOffsetX = 1;
         ctx.shadowOffsetY = 1;
         ctx.fillText(`${percentage}%`, labelX, labelY);
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
+        ctx.restore();
       }
       
       currentAngle += sliceAngle;
@@ -251,6 +286,26 @@ const AdvancedChartRenderer = memo(({
     }
 
   }, [chartType, data, xAxis, yAxis, darkMode, title, rotation, zoom, tiltAngle]); // Make sure all interactive states are in dependencies
+
+  // Debounced controls for smoother UX
+  const debouncedSetRotation = debounce(setRotation, 50);
+  const debouncedSetZoom = debounce(setZoom, 50);
+  const debouncedSetTilt = debounce(setTiltAngle, 50);
+
+  // Use effect for keyboard accessibility
+  useEffect(() => {
+    if (chartType !== '3d-pie') return;
+    const handleKey = (e) => {
+      if (document.activeElement !== document.body) return;
+      if (e.key === 'ArrowLeft') debouncedSetRotation(r => r - Math.PI / 18);
+      if (e.key === 'ArrowRight') debouncedSetRotation(r => r + Math.PI / 18);
+      if (e.key === '+') debouncedSetZoom(z => Math.min(2, z + 0.1));
+      if (e.key === '-') debouncedSetZoom(z => Math.max(0.5, z - 0.1));
+      if (e.key.toLowerCase() === 't') debouncedSetTilt(t => Math.max(0.2, Math.min(1, t + 0.1)));
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [chartType]);
 
   // Color schemes for different themes
   const getColorScheme = (theme = 'default') => {
@@ -1070,8 +1125,12 @@ const AdvancedChartRenderer = memo(({
       );
     }
 
-    if (chartType === '3d-pie') return render3DPieChart();
-    if (chartType === 'pie' || chartType === 'doughnut') return renderEnhancedPieChart();
+    if (chartType === '3d-pie') {
+      return render3DPieChart();
+    }
+    if (chartType === 'pie' || chartType === 'doughnut') {
+      return renderEnhancedPieChart();
+    }
     // ... existing code ...
   };
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { BaseUrluser } from "../../endpoint/baseurl";
 import DynamicChart from "./DynamicChart";
+import AIChartRecommender from "./AIChartRecommender";
+import OutlierDetection from "./OutlierDetection";
 import { toast } from "react-toastify";
 import { motion } from 'framer-motion';
 import {
@@ -16,7 +18,8 @@ import {
   FiTarget,
   FiLayers,
   FiRefreshCw,
-  FiEye
+  FiEye,
+  FiZap
 } from "react-icons/fi";
 
 const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
@@ -37,6 +40,12 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
   const [chartRowLimit, setChartRowLimit] = useState(50);
   const [isLoadingFullData, setIsLoadingFullData] = useState(false);
   const [tableData, setTableData] = useState([]);
+
+  // AI Recommendations state
+  const [showAIRecommendations, setShowAIRecommendations] = useState(false);
+  const [aiData, setAiData] = useState([]);
+  const [outliers, setOutliers] = useState({});
+  const [showOutlierDetection, setShowOutlierDetection] = useState(false);
 
   const selectedFile = files?.find((file) => file._id === fileId) || {};
   const sheets = selectedFile?.sheets || [];
@@ -62,7 +71,8 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
       color: "purple",
       charts: [
         { type: "pie", name: "2D Pie Chart", icon: "🥧", description: "Show proportions" },
-        { type: "doughnut", name: "Doughnut Chart", icon: "🍩", description: "Pie with center hole" }
+        { type: "doughnut", name: "Doughnut Chart", icon: "🍩", description: "Pie with center hole" },
+        { type: "3d-pie", name: "3D Pie Chart", icon: "🎯", description: "Interactive 3D pie chart" }
       ]
     }
   };
@@ -233,6 +243,41 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
       toast.info("Please select X and Y axes first!");
       return;
     }
+  };
+
+  // Handle AI chart recommendation selection
+  const handleAIChartSelect = (recommendation) => {
+    setChartType(recommendation.chartType);
+    setXAxis(recommendation.xAxis);
+    setYAxis(recommendation.yAxis);
+    setShowAIRecommendations(false);
+    toast.success(`Applied AI recommendation: ${recommendation.chartType} chart`);
+  };
+
+  // Update AI data when axes change
+  useEffect(() => {
+    if (processedData.length > 0 && showAIRecommendations) {
+      setAiData(processedData);
+    }
+  }, [xAxis, yAxis, processedData, showAIRecommendations]);
+
+  // Toggle AI recommendations
+  const toggleAIRecommendations = () => {
+    if (!showAIRecommendations && processedData.length > 0) {
+      // Prepare data for AI analysis - include all columns
+      setAiData(processedData);
+    }
+    setShowAIRecommendations(!showAIRecommendations);
+  };
+
+  // Handle outlier detection updates
+  const handleOutliersUpdate = (outlierData) => {
+    setOutliers(outlierData);
+  };
+
+  // Toggle outlier detection
+  const toggleOutlierDetection = () => {
+    setShowOutlierDetection(!showOutlierDetection);
   };
 
   // Get color classes for categories
@@ -428,9 +473,9 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
                   </div>
                   )}
                 </button>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Main Content */}
         <div className="p-6 space-y-8">
@@ -461,7 +506,7 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
                     </button>
                   );
                 })}
-              </div>
+        </div>
 
               {/* Chart Cards with Scroll */}
               <div className="max-h-64 overflow-y-auto scrollbar-thin">
@@ -498,6 +543,131 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
                 </div>
               </div>
             </div>
+
+            {/* AI Recommendations Section */}
+            {processedData.length > 0 && xAxis && yAxis && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`text-lg font-semibold ${
+                    darkMode ? 'text-gray-200' : 'text-gray-800'
+                  }`}>
+                    🤖 AI Chart Recommendations
+                  </h3>
+                  <button
+                    onClick={toggleAIRecommendations}
+                    className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      showAIRecommendations
+                        ? (darkMode ? 'bg-purple-600 text-white' : 'bg-purple-500 text-white')
+                        : (darkMode ? 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/70' : 'bg-purple-50 text-purple-700 hover:bg-purple-100')
+                    }`}
+                  >
+                    <FiZap className="h-4 w-4 mr-2" />
+                    {showAIRecommendations ? 'Hide AI' : 'Show AI Recommendations'}
+                  </button>
+                </div>
+                
+                {showAIRecommendations && (
+                  <div className={`rounded-xl border p-6 ${
+                    darkMode ? 'border-purple-600 bg-purple-900/20' : 'border-purple-200 bg-purple-50/50'
+                  }`}>
+                    <AIChartRecommender
+                      data={aiData}
+                      columns={[xAxis, yAxis].filter(Boolean)}
+                      darkMode={darkMode}
+                      onChartSelect={handleAIChartSelect}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AI Recommendations Prompt */}
+            {processedData.length > 0 && (!xAxis || !yAxis) && (
+              <div className="mb-8">
+                <div className={`rounded-xl border p-6 ${
+                  darkMode ? 'border-purple-600 bg-purple-900/20' : 'border-purple-200 bg-purple-50/50'
+                }`}>
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-purple-900/30' : 'bg-purple-50'}`}>
+                      <FiZap className={`h-6 w-6 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+                    </div>
+                    <div>
+                      <h3 className={`text-lg font-semibold ${
+                        darkMode ? 'text-gray-200' : 'text-gray-800'
+                      }`}>
+                        🤖 AI Chart Recommendations
+                      </h3>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Select X and Y axes above to get AI-powered chart recommendations
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Outlier Detection Section */}
+            {processedData.length > 0 && xAxis && yAxis && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`text-lg font-semibold ${
+                    darkMode ? 'text-gray-200' : 'text-gray-800'
+                  }`}>
+                    🎯 Outlier Detection
+                  </h3>
+                  <button
+                    onClick={toggleOutlierDetection}
+                    className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      showOutlierDetection
+                        ? (darkMode ? 'bg-orange-600 text-white' : 'bg-orange-500 text-white')
+                        : (darkMode ? 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/70' : 'bg-orange-50 text-orange-700 hover:bg-orange-100')
+                    }`}
+                  >
+                    <FiTarget className="h-4 w-4 mr-2" />
+                    {showOutlierDetection ? 'Hide Outliers' : 'Show Outlier Detection'}
+                  </button>
+                </div>
+                
+                {showOutlierDetection && (
+                  <div className={`rounded-xl border p-6 ${
+                    darkMode ? 'border-orange-600 bg-orange-900/20' : 'border-orange-200 bg-orange-50/50'
+                  }`}>
+                    <OutlierDetection
+                      data={processedData}
+                      xAxis={xAxis}
+                      yAxis={yAxis}
+                      darkMode={darkMode}
+                      onOutliersUpdate={handleOutliersUpdate}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Outlier Detection Prompt */}
+            {processedData.length > 0 && (!xAxis || !yAxis) && (
+              <div className="mb-8">
+                <div className={`rounded-xl border p-6 ${
+                  darkMode ? 'border-orange-600 bg-orange-900/20' : 'border-orange-200 bg-orange-50/50'
+                }`}>
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-orange-900/30' : 'bg-orange-50'}`}>
+                      <FiTarget className={`h-6 w-6 ${darkMode ? 'text-orange-400' : 'text-orange-600'}`} />
+                    </div>
+                    <div>
+                      <h3 className={`text-lg font-semibold ${
+                        darkMode ? 'text-gray-200' : 'text-gray-800'
+                      }`}>
+                        🎯 Outlier Detection
+                      </h3>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Select X and Y axes above to detect data anomalies and outliers
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Chart Visualization Section */}
           <div className={`rounded-xl border p-6 ${
@@ -624,7 +794,7 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
                   <div className="text-center">
                     <p className="text-lg">No valid data for selected axes</p>
                       <p className="text-sm mt-2">Try selecting different columns or loading full dataset</p>
-                    </div>
+                  </div>
                 </div>
               ) : (
                 <DynamicChart
@@ -645,6 +815,7 @@ const FileAnalyzer = ({ fileId, onClose, files, darkMode, onFilesUpdate }) => {
                     }}
                     fileId={fileId}
                     sheetName={currentSheet.name}
+                    outliers={outliers}
                 />
               )}
             </div>
